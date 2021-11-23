@@ -400,10 +400,6 @@ static inline void *kvmalloc(size_t size, gfp_t flags)
 {
 	return kvmalloc_node(size, flags, NUMA_NO_NODE);
 }
-static inline void *kvzalloc(size_t size, gfp_t flags)
-{
-	return kvmalloc(size, flags | __GFP_ZERO);
-}
 extern void kvfree(const void *addr);
 
 static inline void compound_lock(struct page *page)

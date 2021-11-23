@@ -326,6 +326,9 @@ static int fscrypt_d_revalidate(struct dentry *dentry, unsigned int flags)
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 
+	if (flags & LOOKUP_RCU)
+		return -ECHILD;
+
 	dir = dget_parent(dentry);
 	if (!IS_ENCRYPTED(d_inode(dir))) {
 		dput(dir);
