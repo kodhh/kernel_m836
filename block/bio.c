@@ -909,6 +909,29 @@ int submit_bio_wait(int rw, struct bio *bio)
 EXPORT_SYMBOL(submit_bio_wait);
 
 /**
+ * submit_bio_wait_zram - submit a bio, and wait until it completes
+ * @bio: The &struct bio which describes the I/O
+ *
+ * Simple wrapper around submit_bio(). Returns 0 on success, or the error from
+ * bio_endio() on failure.
+ */
+int submit_bio_wait_zram(struct bio *bio)
+{
+	struct submit_bio_ret ret;
+	int rw = 0;
+
+	init_completion(&ret.event);
+	bio->bi_private = &ret;
+	bio->bi_end_io = submit_bio_wait_endio;
+	rw |= REQ_SYNC;
+	submit_bio(rw, bio);
+	wait_for_completion_io(&ret.event);
+
+	return ret.error;
+}
+EXPORT_SYMBOL(submit_bio_wait_zram);
+
+/**
  * bio_advance - increment/complete a bio by some number of bytes
  * @bio:	bio to advance
  * @bytes:	number of bytes to complete
@@ -1750,6 +1773,34 @@ void bio_check_pages_dirty(struct bio *bio)
 		bio_put(bio);
 	}
 }
+
+void generic_start_io_acct(int rw, unsigned long sectors,
+			   struct hd_struct *part)
+{
+	int cpu = part_stat_lock();
+
+	part_round_stats(cpu, part);
+	part_stat_inc(cpu, part, ios[rw]);
+	part_stat_add(cpu, part, sectors[rw], sectors);
+	part_inc_in_flight(part, rw);
+
+	part_stat_unlock();
+}
+EXPORT_SYMBOL(generic_start_io_acct);
+
+void generic_end_io_acct(int rw, struct hd_struct *part,
+			 unsigned long start_time)
+{
+	unsigned long duration = jiffies - start_time;
+	int cpu = part_stat_lock();
+
+	part_stat_add(cpu, part, ticks[rw], duration);
+	part_round_stats(cpu, part);
+	part_dec_in_flight(part, rw);
+
+	part_stat_unlock();
+}
+EXPORT_SYMBOL(generic_end_io_acct);
 
 #if ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE
 void bio_flush_dcache_pages(struct bio *bi)

@@ -1,0 +1,55 @@
+--- kernel/sysctl.c
++++ kernel/sysctl.c
+@@ -298,20 +307,21 @@ static struct ctl_table kern_table[] = {
+ 	},
+ #ifndef CONFIG_SCHED_HMP
+ 	{
+-		.procname	= "sched_wake_to_idle",
+-		.data		= &sysctl_sched_wake_to_idle,
++		.procname	= "sched_capacity_margin",
++ 		.data		= &sysctl_sched_capacity_margin,
+ 		.maxlen		= sizeof(unsigned int),
+ 		.mode		= 0644,
+ 		.proc_handler	= proc_dointvec,
+ 	},
+ #endif
+-	{
++/*	{
+ 		.procname	= "sched_wakeup_load_threshold",
+ 		.data		= &sysctl_sched_wakeup_load_threshold,
+ 		.maxlen		= sizeof(unsigned int),
+ 		.mode		= 0644,
+ 		.proc_handler	= proc_dointvec,
+ 	},
++*/
+ #ifdef CONFIG_SCHED_FREQ_INPUT
+ 	{
+ 		.procname	= "sched_freq_inc_notify",
+@@ -702,27 +726,6 @@ static struct ctl_table kern_table[] = {
+ 		.extra1		= &one,
+ 	},
+ #endif
+-#ifdef CONFIG_SCHEDSTATS
+-	{
+-		.procname	= "sched_latency_panic_threshold_us",
+-		.data		= &sysctl_sched_latency_panic_threshold,
+-		.maxlen		= sizeof(unsigned int),
+-		.mode		= 0644,
+-		.proc_handler	= proc_dointvec_minmax,
+-	},
+-	{
+-		.procname	= "sched_latency_warn_threshold_us",
+-		.data		= &sysctl_sched_latency_warn_threshold,
+-		.maxlen		= sizeof(unsigned int),
+-		.mode		= 0644,
+-		.proc_handler	= proc_dointvec_minmax,
+-	},
+-	{
+-		.procname	= "sched_max_latency_us",
+-		.mode		= 0644,
+-		.proc_handler	= sched_max_latency_sysctl,
+-	},
+-#endif
+ #ifdef CONFIG_PROVE_LOCKING
+ 	{
+ 		.procname	= "prove_locking",

@@ -203,7 +203,7 @@ static void vnswap_make_request(struct request_queue *queue,
 {
 	// Deliberately error out on kernel swap
 	if (likely(current->flags & PF_KTHREAD))
-		bio_io_error(bio);
+		{bio_io_error(bio);}
 	else
 		__vnswap_make_request(bio, bio_data_dir(bio));
 

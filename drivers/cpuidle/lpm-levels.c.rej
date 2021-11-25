@@ -1,0 +1,11 @@
+--- drivers/cpuidle/lpm-levels.c
++++ drivers/cpuidle/lpm-levels.c
+@@ -1373,7 +1373,7 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
+ 	cluster_unprepare(cluster, cpumask, idx, true);
+ 	cpu_unprepare(cluster, idx, true);
+ 
+-	sched_set_cpu_cstate(smp_processor_id(), 0, 0, 0);
++	sched_set_cpu_cstate(smp_processor_id(), 0, &drv->states[0], 0, 0);
+ 
+ 	time = ktime_to_ns(ktime_get()) - time;
+ 	do_div(time, 1000);

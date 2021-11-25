@@ -56,11 +56,15 @@ void *zpool_map_handle(struct zpool *pool, unsigned long handle,
 
 void zpool_unmap_handle(struct zpool *pool, unsigned long handle);
 
+unsigned long zpool_get_num_compacted(struct zpool *pool);
+
 u64 zpool_get_total_size(struct zpool *pool);
 
 unsigned long zpool_compact(struct zpool *pool);
 
 bool zpool_compactable(struct zpool *pool, unsigned int pages);
+
+size_t zpool_huge_class_size(struct zpool *zpool);
 
 /**
  * struct zpool_driver - driver implementation for zpool
@@ -100,10 +104,12 @@ struct zpool_driver {
 	void (*unmap)(void *pool, unsigned long handle);
 
 	unsigned long (*compact)(void *pool);
+	unsigned long (*get_num_compacted)(void *pool);
 
 	bool (*compactable)(void *pool, unsigned int pages);
 
 	u64 (*total_size)(void *pool);
+	size_t (*huge_class_size)(void *pool);
 };
 
 void zpool_register_driver(struct zpool_driver *driver);
