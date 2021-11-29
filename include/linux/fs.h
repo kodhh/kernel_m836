@@ -2427,11 +2427,11 @@ extern ssize_t kernel_write(struct file *, const char *, size_t, loff_t);
 extern ssize_t __kernel_write(struct file *, const char *, size_t, loff_t *);
 extern struct file * open_exec(const char *);
  
+extern char *file_path(struct file *, char *, int);
+
 /* fs/dcache.c -- generic fs support functions */
 extern int is_subdir(struct dentry *, struct dentry *);
 extern int path_is_under(struct path *, struct path *);
-
-extern char *file_path(struct file *, char *, int);
 
 #include <linux/err.h>
 

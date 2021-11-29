@@ -867,6 +867,10 @@ static inline struct request_queue *bdev_get_queue(struct block_device *bdev)
 	return bdev->bd_disk->queue;	/* this is never NULL */
 }
 
+#ifndef SECTOR_SHIFT
+#define SECTOR_SHIFT 9
+#endif
+
 /*
  * blk_rq_pos()			: the current sector
  * blk_rq_bytes()		: bytes left in the entire request

@@ -16,7 +16,7 @@
 #define _ZRAM_DRV_H_
 
 #include <linux/rwsem.h>
-#include <linux/zpool.h>
+#include <linux/zsmalloc.h>
 #include <linux/crypto.h>
 
 #include "zcomp.h"
@@ -28,9 +28,6 @@
 #define ZRAM_SECTOR_PER_LOGICAL_BLOCK	\
 	(1 << (ZRAM_LOGICAL_BLOCK_SHIFT - SECTOR_SHIFT))
 
-#ifndef SECTOR_SHIFT
-#define SECTOR_SHIFT 9
-#endif
 
 /*
  * The lower ZRAM_FLAG_SHIFT bits of table.flags is for
@@ -94,7 +91,7 @@ struct zram_stats {
 
 struct zram {
 	struct zram_table_entry *table;
-	struct zpool *mem_pool;
+	struct zs_pool *mem_pool;
 	struct zcomp *comp;
 	struct gendisk *disk;
 	/* Prevent concurrent execution of device init */
@@ -105,10 +102,10 @@ struct zram {
 	unsigned long limit_pages;
 
 	struct zram_stats stats;
-	atomic_t refcount; /* refcount for zram_meta */
-	/* wait all IO under all of cpu are done */
-	wait_queue_head_t io_done;
-
+	/*
+	 * This is the limit on amount of *uncompressed* worth of data
+	 * we can store in a disk.
+	 */
 	u64 disksize;	/* bytes */
 	char compressor[CRYPTO_MAX_ALG_NAME];
 	/*

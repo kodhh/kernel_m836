@@ -366,14 +366,6 @@ static void zs_zpool_unmap(void *pool, unsigned long handle)
 	zs_unmap_object(pool, handle);
 }
 
-static unsigned long zs_zpool_get_compacted(void *pool)
-{
-	struct zs_pool_stats stats;
-
-	zs_pool_stats(pool, &stats);
-	return stats.pages_compacted;
-}
-
 static u64 zs_zpool_total_size(void *pool)
 {
 	return zs_get_total_pages(pool) << PAGE_SHIFT;
@@ -389,11 +381,6 @@ static bool zs_zpool_compactable(void *pool, unsigned int pages)
 	return zs_compactable(pool, pages);
 }
 
-static size_t zs_zpool_huge_class_size(void *pool)
-{
-	return zs_huge_class_size(pool);
-}
-
 static struct zpool_driver zs_zpool_driver = {
 	.type =		"zsmalloc",
 	.owner =	THIS_MODULE,
@@ -407,9 +394,6 @@ static struct zpool_driver zs_zpool_driver = {
 	.total_size =	zs_zpool_total_size,
 	.compact =	zs_zpool_compact,
 	.compactable =	zs_zpool_compactable,
-	.get_num_compacted = zs_zpool_get_compacted,
-	.total_size =	zs_zpool_total_size,
-	.huge_class_size = zs_zpool_huge_class_size,
 };
 
 MODULE_ALIAS("zpool-zsmalloc");
@@ -1327,6 +1311,25 @@ out:
 }
 EXPORT_SYMBOL_GPL(zs_map_object);
 
+/**
+ * zs_huge_class_size() - Returns the size (in bytes) of the first huge
+ *                        zsmalloc &size_class.
+ * @pool: zsmalloc pool to use
+ *
+ * The function returns the size of the first huge class - any object of equal
+ * or bigger size will be stored in zspage consisting of a single physical
+ * page.
+ *
+ * Context: Any context.
+ *
+ * Return: the size (in bytes) of the first huge zsmalloc &size_class.
+ */
+size_t zs_huge_class_size(struct zs_pool *pool)
+{
+	return huge_class_size;
+}
+EXPORT_SYMBOL_GPL(zs_huge_class_size);
+
 void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
 {
 	struct page *page;
@@ -1361,25 +1364,6 @@ void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
 	unpin_tag(handle);
 }
 EXPORT_SYMBOL_GPL(zs_unmap_object);
-
-/**
- * zs_huge_class_size() - Returns the size (in bytes) of the first huge
- *                        zsmalloc &size_class.
- * @pool: zsmalloc pool to use
- *
- * The function returns the size of the first huge class - any object of equal
- * or bigger size will be stored in zspage consisting of a single physical
- * page.
- *
- * Context: Any context.
- *
- * Return: the size (in bytes) of the first huge zsmalloc &size_class.
- */
-size_t zs_huge_class_size(struct zs_pool *pool)
-{
-	return huge_class_size;
-}
-EXPORT_SYMBOL_GPL(zs_huge_class_size);
 
 static unsigned long obj_malloc(struct page *first_page,
 		struct size_class *class, unsigned long handle)

@@ -352,34 +352,11 @@ unsigned long zpool_compact(struct zpool *zpool)
 	return zpool->driver->compact(zpool->pool);
 }
 
-/**
- * zpool_get_num_compacted() - get the number of migrated/compacted pages
- * @pool       The zpool to get compaction statistic for
- *
- * Returns: the total number of migrated pages for the pool
- */
-unsigned long zpool_get_num_compacted(struct zpool *zpool)
-{
-	return zpool->driver->get_num_compacted ?
-		zpool->driver->get_num_compacted(zpool->pool) : 0;
-}
-
 bool zpool_compactable(struct zpool *zpool, unsigned int pages)
 {
 	return zpool->driver->compactable(zpool->pool, pages);
 }
 
-/**
- * zpool_huge_class_size() - get size for the "huge" class
- * @pool	The zpool to check
- *
- * Returns: size of the huge class
- */
-size_t zpool_huge_class_size(struct zpool *zpool)
-{
-	return zpool->driver->huge_class_size ?
-		zpool->driver->huge_class_size(zpool->pool) : 0;
-}
 
 static int __init init_zpool(void)
 {

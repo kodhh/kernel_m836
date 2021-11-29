@@ -195,8 +195,7 @@ static inline bool bvec_gap_to_prev(struct bio_vec *bprv, unsigned int offset)
 	return offset || ((bprv->bv_offset + bprv->bv_len) & (PAGE_SIZE - 1));
 }
 
-#define bio_io_error(bio) bio->bi_error = -EIO;			\
-			  bio_endio((bio), -EIO)
+#define bio_io_error(bio) bio_endio((bio), -EIO)
 
 /*
  * drivers should _never_ use the all version - the bio may have been split
@@ -451,11 +450,10 @@ static inline struct bio *bio_clone_kmalloc(struct bio *bio, gfp_t gfp_mask)
 }
 
 extern void bio_endio(struct bio *, int);
-
 extern void bio_endio_nodec(struct bio *, int);
 struct request_queue;
 extern int bio_phys_segments(struct request_queue *, struct bio *);
-extern int submit_bio_wait_zram(struct bio *bio);
+
 extern int submit_bio_wait(int rw, struct bio *bio);
 extern void bio_advance(struct bio *, unsigned);
 

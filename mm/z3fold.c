@@ -63,7 +63,6 @@ struct z3fold_pool {
 #ifdef CONFIG_ZPOOL
 	struct zpool *zpool;
 	const struct zpool_ops *zpool_ops;
-	atomic_t compacted_nr;
 #endif
 };
 
@@ -665,11 +664,6 @@ u64 z3fold_get_pool_size(struct z3fold_pool *pool)
  * zpool
  ****************/
 
-static unsigned long z3fold_get_num_compacted(struct z3fold_pool *pool)
-{
-	return atomic_read(&pool->compacted_nr);
-}
-
 #ifdef CONFIG_ZPOOL
 
 static int z3fold_zpool_evict(struct z3fold_pool *pool, unsigned long handle)
@@ -747,11 +741,6 @@ static u64 z3fold_zpool_total_size(void *pool)
 	return z3fold_get_pool_size(pool) * PAGE_SIZE;
 }
 
-static size_t z3fold_zpool_huge_class_size(void *pool)
-{
-	return PAGE_SIZE - ZHDR_SIZE_ALIGNED;
-}
-
 static unsigned long z3fold_zpool_compact(void *pool)
 {
 	return 0;
@@ -760,11 +749,6 @@ static unsigned long z3fold_zpool_compact(void *pool)
 static bool z3fold_zpool_compactable(void *pool, unsigned int pages)
 {
 	return false;
-}
-
-static unsigned long z3fold_zpool_get_compacted(void *pool)
-{
-	return z3fold_get_num_compacted(pool);
 }
 
 static struct zpool_driver z3fold_zpool_driver = {
@@ -778,9 +762,7 @@ static struct zpool_driver z3fold_zpool_driver = {
 	.map =		z3fold_zpool_map,
 	.unmap =	z3fold_zpool_unmap,
 	.total_size =	z3fold_zpool_total_size,
-	.huge_class_size = z3fold_zpool_huge_class_size,
 	.compact =	z3fold_zpool_compact,
-	.get_num_compacted = z3fold_zpool_get_compacted,
 	.compactable =	z3fold_zpool_compactable,
 
 };
