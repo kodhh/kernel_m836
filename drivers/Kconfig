@@ -86,8 +86,6 @@ source "drivers/mfd/Kconfig"
 
 source "drivers/regulator/Kconfig"
 
-source "drivers/media/Kconfig"
-
 source "drivers/video/Kconfig"
 
 source "sound/Kconfig"
@@ -195,5 +193,12 @@ source "drivers/sensors/Kconfig"
 source "drivers/firmware/Kconfig"
 
 source "drivers/bif/Kconfig"
+
+config NEW_MEDIA_DRIVER
+	bool "NEW Media for P or Q."
+
+source "drivers/media-Q/Kconfig"
+
+source "drivers/media/Kconfig"
 
 endmenu

@@ -623,7 +623,6 @@ static int read_from_bdev_async(struct zram *zram, struct bio_vec *bvec,
 	}
 
 
-	set_bit(BIO_UPTODATE, &bio->bi_flags);
 	submit_bio(READ, bio);
 	return 1;
 }
@@ -745,7 +744,7 @@ static ssize_t writeback_store(struct device *dev,
 		 * XXX: A single page IO would be inefficient for write
 		 * but it would be not bad as starter.
 		 */
-		set_bit(BIO_UPTODATE, &bio.bi_flags);
+		 
 		ret = submit_bio_wait(WRITE, &bio);
 		if (ret) {
 			zram_slot_lock(zram, index);

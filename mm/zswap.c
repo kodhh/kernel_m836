@@ -92,7 +92,7 @@ static atomic_t zswap_zero_pages = ATOMIC_INIT(0);
 **********************************/
 /* Enable/disable zswap (disabled by default) */
 static bool zswap_enabled;
-module_param_named(enabled, zswap_enabled, bool, 0644);
+module_param_named(enabled, zswap_enabled, bool, 0);
 
 /* Compressor to be used by zswap (fixed at boot for now) */
 #define ZSWAP_COMPRESSOR_DEFAULT "lzo-rle"
