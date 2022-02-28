@@ -103,7 +103,7 @@ obj-$(CONFIG_I2O)		+= message/
 obj-$(CONFIG_RTC_LIB)		+= rtc/
 obj-y				+= i2c/
 ifeq ($(CONFIG_NEW_MEDIA_DRIVER),y)
-obj-y				+= media-Q/
+obj-y				+= media-new/
 else
 obj-y				+= media/
 endif

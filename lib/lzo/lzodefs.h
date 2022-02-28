@@ -35,9 +35,9 @@
 #define LZO_USE_CTZ64	1
 #define LZO_USE_CTZ32	1
 #define LZO_FAST_64BIT_MEMORY_ACCESS
-#elif defined(CONFIG_X86) || defined(CONFIG_PPC)
+#elif defined(__i386__) || defined(__powerpc__)
 #define LZO_USE_CTZ32	1
-#elif defined(CONFIG_ARM) && (__LINUX_ARM_ARCH__ >= 5)
+#elif defined(__arm__) && (__LINUX_ARM_ARCH__ >= 5)
 #define LZO_USE_CTZ32	1
 #endif
 
