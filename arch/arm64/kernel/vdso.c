@@ -205,8 +205,10 @@ static int __init vdso_mappings_init(const char *name,
 	if (vdso_pagelist == NULL)
 		return -ENOMEM;
 
+	kmemleak_not_leak(vdso_pagelist);
+
 	/* Grab the vDSO data page. */
-	vdso_pagelist[0] = virt_to_page(vdso_data);
+	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
 
 	/* Grab the vDSO code pages. */
 	pfn = sym_to_pfn(code_start);
