@@ -20,8 +20,6 @@
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 
-#define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
-
 extern const compat_ulong_t aarch32_sigret_code[6];
 
 struct compat_sigcontext {
