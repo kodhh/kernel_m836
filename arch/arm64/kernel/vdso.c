@@ -20,14 +20,14 @@
  * Author: Will Deacon <will.deacon@arm.com>
  */
 
-#include <linux/kernel.h>
+#include <linux/cache.h>
 #include <linux/clocksource.h>
 #include <linux/elf.h>
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/gfp.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/moduleparam.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/slab.h>
@@ -38,19 +38,6 @@
 #include <asm/signal32.h>
 #include <asm/vdso.h>
 #include <asm/vdso_datapage.h>
-
-#ifdef USE_SYSCALL
-#if defined(__LP64__)
-static int enable_64 = 1;
-module_param(enable_64, int, 0600);
-MODULE_PARM_DESC(enable_64, "enable vDSO for aarch64 0=off");
-#endif
-#if (!defined(__LP64) || (defined(CONFIG_COMPAT) && defined(CONFIG_VDSO32)))
-static int enable_32 = 1;
-module_param(enable_32, int, 0600);
-MODULE_PARM_DESC(enable_32, "enable vDSO for aarch64 0=off");
-#endif
-#endif
 
 struct vdso_mappings {
 	unsigned long num_code_pages;
@@ -168,6 +155,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
 				       &compat_vdso_spec[1]);
 #endif
 out:
+
 	up_write(&mm->mmap_sem);
 
 	return PTR_ERR_OR_ZERO(ret);
@@ -182,7 +170,7 @@ static int __init vdso_mappings_init(const char *name,
 {
 	unsigned long i, vdso_pages;
 	struct page **vdso_pagelist;
- 	unsigned long pfn;
+	unsigned long pfn;
 
 	if (memcmp(code_start, "\177ELF", 4)) {
 		pr_err("%s is not a valid ELF object!\n", name);
@@ -205,8 +193,6 @@ static int __init vdso_mappings_init(const char *name,
 	if (vdso_pagelist == NULL)
 		return -ENOMEM;
 
-	kmemleak_not_leak(vdso_pagelist);
-
 	/* Grab the vDSO data page. */
 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
 
@@ -228,7 +214,7 @@ static int __init vdso_mappings_init(const char *name,
 	};
 
 	mappings->num_code_pages = vdso_pages;
- 	return 0;
+	return 0;
 }
 
 #ifdef CONFIG_COMPAT
@@ -257,7 +243,6 @@ static int __init vdso_init(void)
 	return vdso_mappings_init("vdso", vdso_start, vdso_end,
 				  &vdso_mappings);
 }
-
 arch_initcall(vdso_init);
 
 static int vdso_setup(struct mm_struct *mm,
@@ -286,6 +271,7 @@ static int vdso_setup(struct mm_struct *mm,
 				       &mappings->code_mapping);
 	if (!IS_ERR(ret))
 		mm->context.vdso = (void *)vdso_base;
+
 	return PTR_ERR_OR_ZERO(ret);
 }
 
@@ -322,7 +308,9 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	int ret;
 
 	down_write(&mm->mmap_sem);
+
 	ret = vdso_setup(mm, &vdso_mappings);
+
 	up_write(&mm->mmap_sem);
 	return ret;
 }
@@ -335,23 +323,6 @@ void update_vsyscall(struct timekeeper *tk)
 	struct timespec xtime_coarse;
 	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
 
-#ifdef USE_SYSCALL
-	if (use_syscall) {
-		use_syscall = USE_SYSCALL | USE_SYSCALL_32 | USE_SYSCALL_64;
-	} else {
-#if (defined(__LP64__))
-		if (!enable_64)
-#endif
-			use_syscall = USE_SYSCALL_64;
-#if (!defined(__LP64) || (defined(CONFIG_COMPAT) && defined(CONFIG_VDSO32)))
-		if (!enable_32)
-#endif
-			use_syscall |= USE_SYSCALL_32;
-		if (use_syscall == (USE_SYSCALL_32 | USE_SYSCALL_64))
-			use_syscall |= USE_SYSCALL;
-	}
-#endif
-
 	++vdso_data->tb_seq_count;
 	smp_wmb();
 
@@ -362,20 +333,15 @@ void update_vsyscall(struct timekeeper *tk)
 	vdso_data->wtm_clock_sec		= tk->wall_to_monotonic.tv_sec;
 	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
 
-#ifdef USE_SYSCALL
-	if (!(use_syscall & USE_SYSCALL)) {
-#else
 	if (!use_syscall) {
-#endif
 		struct timespec btm = ktime_to_timespec(tk->offs_boot);
 
 		/* tkr_mono.cycle_last == tkr_raw.cycle_last */
 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
-		vdso_data->raw_time_sec		= tk->raw_time.tv_sec;
-		vdso_data->raw_time_nsec	= tk->raw_time.tv_nsec;
+		vdso_data->raw_time_sec		= tk->raw_sec;
+		vdso_data->raw_time_nsec	= tk->tkr_raw.xtime_nsec;
 		vdso_data->xtime_clock_sec	= tk->xtime_sec;
 		vdso_data->xtime_clock_snsec	= tk->tkr_mono.xtime_nsec;
-		/* tkr_raw.xtime_nsec == 0 */
 		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
 		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
 		/* tkr_mono.shift == tkr_raw.shift */
