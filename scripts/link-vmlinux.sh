@@ -134,8 +134,18 @@ vmlinux_link()
 	local lds="${objtree}/${KBUILD_LDS}"
 	local objects
 
+ 	if [ "${SRCARCH}" != "um" ]; then
 		if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
-			objects="--whole-archive			\
+		local ld=${LD}
+		local ldflags="${LDFLAGS} ${LDFLAGS_vmlinux}"
+
+		if [ -n "${LDFINAL_vmlinux}" ]; then
+			ld=${LDFINAL_vmlinux}
+			ldflags="${LDFLAGS_FINAL_vmlinux} ${LDFLAGS_vmlinux}"
+		fi
+
+		if [[ -n "${CONFIG_THIN_ARCHIVES}" && -z "${CONFIG_LTO_CLANG}" ]]; then
+			objects="--whole-archive 
 				built-in.o				\
 				--no-whole-archive			\
 				--start-group				\
