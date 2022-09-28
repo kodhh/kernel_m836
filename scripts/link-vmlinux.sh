@@ -149,7 +149,6 @@ vmlinux_link()
 	local objects
 
  	if [ "${SRCARCH}" != "um" ]; then
-		if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
 		local ld=${LD}
 		local ldflags="${LDFLAGS} ${LDFLAGS_vmlinux}"
 
