@@ -11,7 +11,7 @@ ifneq ($(GCC_ARM32_TC),)
   CC_ARM32 += --gcc-toolchain=$(GCC_ARM32_TC)
 endif
 else
-  CC_ARM32 := $(CROSS_COMPILE_ARM32)gcc
+  CC_ARM32 := $(CROSS_COMPILE_ARM32)$(cc-name)
 endif
 
 # Same as cc-*option, but using CC_ARM32 instead of CC
@@ -74,7 +74,11 @@ VDSO_CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
                -Werror-implicit-function-declaration \
                -Wno-format-security \
                -std=gnu89
+ifeq ($(cc-name),clang)
+VDSO_CFLAGS  += -O3
+else
 VDSO_CFLAGS  += -O2
+endif
 # Some useful compiler-dependent flags from top-level Makefile
 VDSO_CFLAGS += $(call cc32-option,-Wdeclaration-after-statement,)
 VDSO_CFLAGS += $(call cc32-option,-Wno-pointer-sign)
@@ -95,6 +99,9 @@ VDSO_CFLAGS += -Wno-int-to-pointer-cast
 
 VDSO_AFLAGS := $(VDSO_CAFLAGS)
 VDSO_AFLAGS += -D__ASSEMBLY__
+
+VDSO_CFLAGS += -march=armv8-a -mtune=cortex-a72.cortex-a53
+VDSO_AFLAGS += -march=armv8-a -mtune=cortex-a72.cortex-a53
 
 VDSO_LDFLAGS := $(VDSO_CPPFLAGS)
 # From arm vDSO Makefile
