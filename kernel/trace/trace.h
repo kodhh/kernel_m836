@@ -1324,6 +1324,7 @@ static inline void __init trace_event_init(void) { }
 static inlin void trace_event_enum_update(struct trace_enum_map **map, int len) { }
 #endif
 
+extern struct trace_iterator *tracepoint_print_iter;
 
 /*
  * Reset the state of the trace_iterator so that it can read consumed data.
