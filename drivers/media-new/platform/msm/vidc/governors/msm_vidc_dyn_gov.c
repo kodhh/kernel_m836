@@ -17,8 +17,6 @@
 #include "msm_vidc_debug.h"
 #include "vidc_hfi_api.h"
 
-#define VIDC_DBG_WARN_ENABLE (msm_vidc_debug & VIDC_INFO)
-
 static bool debug;
 module_param(debug, bool, 0644);
 
