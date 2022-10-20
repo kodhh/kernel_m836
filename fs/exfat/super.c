@@ -297,7 +297,6 @@ static inline void __exfat_clean_bdev_aliases(struct block_device *bdev, sector_
 }
 #endif
 
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 static int exfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 		struct inode *new_dir, struct dentry *new_dentry,
