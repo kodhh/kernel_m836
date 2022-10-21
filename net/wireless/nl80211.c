@@ -3484,7 +3484,7 @@ out:
 }
 
 static int validate_beacon_tx_rate(struct cfg80211_registered_device *rdev,
-				   enum nl80211_band band,
+				   enum ieee80211_band band,
 				   struct cfg80211_bitrate_mask *beacon_rate)
 {
 	u32 count_ht, count_vht, i;
