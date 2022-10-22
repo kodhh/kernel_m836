@@ -54,6 +54,8 @@
 #define ESR_EL1_EC_BKPT32	(0x38)
 #define ESR_EL1_EC_BRK64	(0x3C)
 
+#include <asm/memory.h>
+
 #define ESR_ELx_EC_UNKNOWN	(0x00)
 #define ESR_ELx_EC_WFx		(0x01)
 /* Unallocated EC: 0x02 */
@@ -173,6 +175,13 @@
 
 #define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 0, 14, 0) | \
 					 ESR_ELx_SYS64_ISS_DIR_READ)
+
+/* ESR value templates for specific events */
+
+/* BRK instruction trap from AArch64 state */
+#define ESR_ELx_VAL_BRK64(imm)					\
+	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+	 ((imm) & 0xffff))
 
 #ifndef __ASSEMBLY__
 #include <asm/types.h>

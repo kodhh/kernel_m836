@@ -66,6 +66,10 @@ static bool __read_mostly tracing_selftest_running;
  */
 bool __read_mostly tracing_selftest_disabled;
 
+/* Pipe tracepoints to printk */
+struct trace_iterator *tracepoint_print_iter;
+int tracepoint_printk;
+
 /* For tracers that don't implement custom flags */
 static struct tracer_opt dummy_tracer_opt[] = {
 	{ }
@@ -195,6 +199,13 @@ static int __init set_trace_boot_clock(char *str)
 }
 __setup("trace_clock=", set_trace_boot_clock);
 
+static int __init set_tracepoint_printk(char *str)
+{
+	if ((strcmp(str, "=0") != 0 && strcmp(str, "=off") != 0))
+		tracepoint_printk = 1;
+	return 1;
+}
+__setup("tp_printk", set_tracepoint_printk);
 
 unsigned long long ns2usecs(cycle_t nsec)
 {
@@ -2087,7 +2098,7 @@ void trace_printk_init_buffers(void)
 	pr_warning("** trace_printk() being used. Allocating extra memory.  **\n");
 	pr_warning("**                                                      **\n");
 	pr_warning("** This means that this is a DEBUG kernel and it is     **\n");
-	pr_warning("** unsafe for produciton use.                           **\n");
+	pr_warning("** unsafe for production use.                           **\n");
 	pr_warning("**                                                      **\n");
 	pr_warning("** If you see this message and you are not debugging    **\n");
 	pr_warning("** the kernel, report this immediately to your vendor!  **\n");
@@ -4048,6 +4059,20 @@ static const struct file_operations tracing_saved_tgids_fops = {
 	.read	= tracing_saved_tgids_read,
 	.llseek	= generic_file_llseek,
 };
+
+static void
+trace_insert_enum_map(struct trace_enum_map **start, struct trace_enum_map **stop)
+{
+	struct trace_enum_map **map;
+	int len = stop - start;
+
+	if (len <= 0)
+		return;
+
+	map = start;
+
+	trace_event_enum_update(map, len);
+}
 
 static ssize_t
 tracing_set_trace_read(struct file *filp, char __user *ubuf,
@@ -6685,6 +6710,14 @@ struct dentry *tracing_init_dentry(void)
 	return NULL;
 }
 
+extern struct trace_enum_map *__start_ftrace_enum_maps[];
+extern struct trace_enum_map *__stop_ftrace_enum_maps[];
+
+static void __init trace_enum_init(void)
+{
+	trace_insert_enum_map(__start_ftrace_enum_maps, __stop_ftrace_enum_maps);
+}
+
 static __init int tracer_init_tracefs(void)
 {
 	struct dentry *d_tracer;
@@ -6708,6 +6741,8 @@ static __init int tracer_init_tracefs(void)
 
 	trace_create_file("saved_cmdlines_size", 0644, d_tracer,
 			  NULL, &tracing_saved_cmdlines_size_fops);
+
+	trace_enum_init();
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 	trace_create_file("dyn_ftrace_total_info", 0444, d_tracer,
@@ -7016,6 +7051,12 @@ out:
 
 void __init trace_init(void)
 {
+	if (tracepoint_printk) {
+		tracepoint_print_iter =
+			kmalloc(sizeof(*tracepoint_print_iter), GFP_KERNEL);
+		if (WARN_ON(!tracepoint_print_iter))
+			tracepoint_printk = 0;
+	}
 	tracer_alloc_buffers();
 	init_ftrace_syscalls();
 	trace_event_init();	

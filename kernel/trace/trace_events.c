@@ -212,9 +212,41 @@ void *ftrace_event_buffer_reserve(struct ftrace_event_buffer *fbuffer,
 }
 EXPORT_SYMBOL_GPL(ftrace_event_buffer_reserve);
 
+static DEFINE_SPINLOCK(tracepoint_iter_lock);
+
+static void output_printk(struct ftrace_event_buffer *fbuffer)
+{
+	struct ftrace_event_call *event_call;
+	struct trace_event *event;
+	unsigned long flags;
+	struct trace_iterator *iter = tracepoint_print_iter;
+
+	if (!iter)
+		return;
+
+	event_call = fbuffer->ftrace_file->event_call;
+	if (!event_call || !event_call->event.funcs ||
+	    !event_call->event.funcs->trace)
+		return;
+
+	event = &fbuffer->ftrace_file->event_call->event;
+
+	spin_lock_irqsave(&tracepoint_iter_lock, flags);
+	trace_seq_init(&iter->seq);
+	iter->ent = fbuffer->entry;
+	event_call->event.funcs->trace(iter, 0, event);
+	trace_seq_putc(&iter->seq, 0);
+	printk("%s", iter->seq.buffer);
+
+	spin_unlock_irqrestore(&tracepoint_iter_lock, flags);
+}
+
 void ftrace_event_buffer_commit(struct ftrace_event_buffer *fbuffer,
 				unsigned long len)
 {
+	if (tracepoint_printk)
+		output_printk(fbuffer);
+
 	event_trigger_unlock_commit(fbuffer->ftrace_file, fbuffer->buffer,
 				    fbuffer->event, fbuffer->entry,
 				    fbuffer->flags, fbuffer->pc, len);
@@ -1674,6 +1706,125 @@ __register_event(struct ftrace_event_call *call, struct module *mod)
 	call->mod = mod;
 
 	return 0;
+}
+
+static char *enum_replace(char *ptr, struct trace_enum_map *map, int len)
+{
+	int rlen;
+	int elen;
+
+	/* Find the length of the enum value as a string */
+	elen = snprintf(ptr, 0, "%ld", map->enum_value);
+	/* Make sure there's enough room to replace the string with the value */
+	if (len < elen)
+		return NULL;
+
+	snprintf(ptr, elen + 1, "%ld", map->enum_value);
+
+	/* Get the rest of the string of ptr */
+	rlen = strlen(ptr + len);
+	memmove(ptr + elen, ptr + len, rlen);
+	/* Make sure we end the new string */
+	ptr[elen + rlen] = 0;
+
+	return ptr + elen;
+}
+
+static void update_event_printk(struct ftrace_event_call *call,
+				struct trace_enum_map *map)
+{
+	char *ptr;
+	int quote = 0;
+	int len = strlen(map->enum_string);
+
+	for (ptr = call->print_fmt; *ptr; ptr++) {
+		if (*ptr == '\\') {
+			ptr++;
+			/* paranoid */
+			if (!*ptr)
+				break;
+			continue;
+		}
+		if (*ptr == '"') {
+			quote ^= 1;
+			continue;
+		}
+		if (quote)
+			continue;
+		if (isdigit(*ptr)) {
+			/* skip numbers */
+			do {
+				ptr++;
+				/* Check for alpha chars like ULL */
+			} while (isalnum(*ptr));
+			/*
+			 * A number must have some kind of delimiter after
+			 * it, and we can ignore that too.
+			 */
+			continue;
+		}
+		if (isalpha(*ptr) || *ptr == '_') {
+			if (strncmp(map->enum_string, ptr, len) == 0 &&
+			    !isalnum(ptr[len]) && ptr[len] != '_') {
+				ptr = enum_replace(ptr, map, len);
+				/* Hmm, enum string smaller than value */
+				if (WARN_ON_ONCE(!ptr))
+					return;
+				/*
+				 * No need to decrement here, as enum_replace()
+				 * returns the pointer to the character passed
+				 * the enum, and two enums can not be placed
+				 * back to back without something in between.
+				 * We can skip that something in between.
+				 */
+				continue;
+			}
+		skip_more:
+			do {
+				ptr++;
+			} while (isalnum(*ptr) || *ptr == '_');
+			/*
+			 * If what comes after this variable is a '.' or
+			 * '->' then we can continue to ignore that string.
+			 */
+			if (*ptr == '.' || (ptr[0] == '-' && ptr[1] == '>')) {
+				ptr += *ptr == '.' ? 1 : 2;
+				goto skip_more;
+			}
+			/*
+			 * Once again, we can skip the delimiter that came
+			 * after the string.
+			 */
+			continue;
+		}
+	}
+}
+
+void trace_event_enum_update(struct trace_enum_map **map, int len)
+{
+	struct ftrace_event_call *call, *p;
+	const char *last_system = NULL;
+	int last_i;
+	int i;
+
+	down_write(&trace_event_sem);
+	list_for_each_entry_safe(call, p, &ftrace_events, list) {
+		/* events are usually grouped together with systems */
+		if (!last_system || call->class->system != last_system) {
+			last_i = 0;
+			last_system = call->class->system;
+		}
+
+		for (i = last_i; i < len; i++) {
+			if (call->class->system == map[i]->system) {
+				/* Save the first system if need be */
+				if (!last_i)
+					last_i = i;
+				update_event_printk(call, map[i]);
+			}
+		}
+	}
+	up_write(&trace_event_sem);
 }
 
 static struct ftrace_event_file *

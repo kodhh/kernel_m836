@@ -432,14 +432,22 @@ struct symsearch {
 	bool unused;
 };
 
-/* Search for an exported symbol by name. */
+/*
+ * Search for an exported symbol by name.
+ *
+ * Must be called with module_mutex held or preemption disabled.
+ */
 const struct kernel_symbol *find_symbol(const char *name,
 					struct module **owner,
 					const unsigned long **crc,
 					bool gplok,
 					bool warn);
 
-/* Walk the exported symbol table */
+/*
+ * Walk the exported symbol table
+ *
+ * Must be called with module_mutex held or preemption disabled.
+ */
 bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
 				    struct module *owner,
 				    void *data), void *data);
@@ -554,6 +562,23 @@ static inline bool is_module_percpu_address(unsigned long addr)
 }
 
 static inline bool is_module_text_address(unsigned long addr)
+{
+	return false;
+}
+
+static inline bool within_module_core(unsigned long addr,
+				      const struct module *mod)
+{
+	return false;
+}
+
+static inline bool within_module_init(unsigned long addr,
+				      const struct module *mod)
+{
+	return false;
+}
+
+static inline bool within_module(unsigned long addr, const struct module *mod)
 {
 	return false;
 }

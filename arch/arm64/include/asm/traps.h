@@ -34,13 +34,25 @@ struct undef_hook {
 void register_undef_hook(struct undef_hook *hook);
 void unregister_undef_hook(struct undef_hook *hook);
 
+static inline int __in_irqentry_text(unsigned long ptr)
+{
+	extern char __irqentry_text_start[];
+	extern char __irqentry_text_end[];
+
+	return ptr >= (unsigned long)&__irqentry_text_start &&
+	       ptr < (unsigned long)&__irqentry_text_end;
+}
+
 static inline int in_exception_text(unsigned long ptr)
 {
 	extern char __exception_text_start[];
 	extern char __exception_text_end[];
+	int in;
 
-	return ptr >= (unsigned long)&__exception_text_start &&
-	       ptr < (unsigned long)&__exception_text_end;
+	in = ptr >= (unsigned long)&__exception_text_start &&
+	     ptr < (unsigned long)&__exception_text_end;
+
+	return in ? : __in_irqentry_text(ptr);
 }
 
 static inline void get_pct_hook_init(void) {}
