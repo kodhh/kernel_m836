@@ -194,11 +194,6 @@ source "drivers/firmware/Kconfig"
 
 source "drivers/bif/Kconfig"
 
-config NEW_MEDIA_DRIVER
-	bool "NEW Media DRIVER for P or Q."
-
-source "drivers/media-new/Kconfig"
-
 source "drivers/media/Kconfig"
 
 endmenu

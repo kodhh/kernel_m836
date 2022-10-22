@@ -132,13 +132,11 @@ config IR_DUMP_DECODER
 	---help---
 	   Enable this option if you have an infrared remote control which
 	   you want to dump the IR signal.
-
 endif #RC_DECODERS
 
 menuconfig RC_DEVICES
 	bool "Remote Controller devices"
 	depends on RC_CORE
-	default y
 
 if RC_DEVICES
 
@@ -351,7 +349,6 @@ config IR_GPIO_CIR
 
 	   To compile this driver as a module, choose M here: the module will
 	   be called gpio-ir-recv.
-
 
 config IR_GPIO
 	tristate "GPIO IR remote control"

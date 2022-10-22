@@ -86,7 +86,7 @@ static int32_t msm_sensor_driver_create_i2c_v4l_subdev
 	struct i2c_client *client = s_ctrl->sensor_i2c_client->client;
 
 	CDBG("%s %s I2c probe succeeded\n", __func__, client->name);
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	if (0 == s_ctrl->bypass_video_node_creation) {
 #endif
 		rc = camera_init_v4l2(&client->dev, &session_id);
@@ -94,7 +94,7 @@ static int32_t msm_sensor_driver_create_i2c_v4l_subdev
 			pr_err("failed: camera_init_i2c_v4l2 rc %d", rc);
 			return rc;
 		}
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	}
 #endif
 
@@ -134,7 +134,7 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 	int32_t rc = 0;
 	uint32_t session_id = 0;
 
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	if (0 == s_ctrl->bypass_video_node_creation) {
 #endif
 		rc = camera_init_v4l2(&s_ctrl->pdev->dev, &session_id);
@@ -142,7 +142,7 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 			pr_err("failed: camera_init_v4l2 rc %d", rc);
 			return rc;
 		}
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	}
 #endif
 
@@ -644,6 +644,7 @@ static int32_t msm_sensor_get_power_settings(void *setting,
 		power_info);
 	if (rc < 0) {
 		pr_err("failed");
+		kfree(power_info->power_setting);
 		return -EINVAL;
 	}
 	return rc;
@@ -764,7 +765,7 @@ int32_t msm_sensor_driver_probe(void *setting,
 			slave_info32->sensor_init_params;
 		slave_info->output_format =
 			slave_info32->output_format;
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 		slave_info->bypass_video_node_creation =
 			!!slave_info32->bypass_video_node_creation;
 #endif
@@ -810,7 +811,7 @@ int32_t msm_sensor_driver_probe(void *setting,
 		slave_info->sensor_init_params.position);
 	CDBG("mount %d",
 		slave_info->sensor_init_params.sensor_mount_angle);
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	CDBG("bypass video node creation %d",
 		slave_info->bypass_video_node_creation);
 #endif
@@ -875,7 +876,7 @@ int32_t msm_sensor_driver_probe(void *setting,
 
 	camera_info = kzalloc(sizeof(struct msm_camera_slave_info), GFP_KERNEL);
 	if (!camera_info)
-		goto free_slave_info;
+		goto free_power_settings;
 
 	s_ctrl->sensordata->slave_info = camera_info;
 
@@ -980,7 +981,7 @@ CSID_TG:
 
 	pr_err("%s probe succeeded", slave_info->sensor_name);
 
-#ifndef CONFIG_MACH_XIAOMI_MIDO
+#ifndef CONFIG_MACH_XIAOMI_C6
 	s_ctrl->bypass_video_node_creation =
 		slave_info->bypass_video_node_creation;
 #endif
@@ -1048,6 +1049,9 @@ camera_power_down:
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
 free_camera_info:
 	kfree(camera_info);
+free_power_settings:
+	kfree(s_ctrl->sensordata->power_info.power_setting);
+	kfree(s_ctrl->sensordata->power_info.power_down_setting);
 free_slave_info:
 	kfree(slave_info);
 	return rc;

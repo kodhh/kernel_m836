@@ -1,7 +1,6 @@
 /* rc-main.c - Remote Controller core module
  *
  * Copyright (C) 2009-2010 by Mauro Carvalho Chehab
- * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -61,7 +60,7 @@ struct rc_map *rc_map_get(const char *name)
 	struct rc_map_list *map;
 
 	map = seek_rc_map(name);
-#ifdef MODULE
+#ifdef CONFIG_MODULES
 	if (!map) {
 		int rc = request_module("%s", name);
 		if (rc < 0) {
@@ -739,7 +738,7 @@ static int ir_open(struct input_dev *idev)
 {
 	struct rc_dev *rdev = input_get_drvdata(idev);
 
-
+#ifdef CONFIG_MACH_XIAOMI_C6
 	int rc = 0;
 
 	mutex_lock(&rdev->lock);
@@ -750,6 +749,9 @@ static int ir_open(struct input_dev *idev)
 	mutex_unlock(&rdev->lock);
 
 	return rc;
+#else
+	return rc_open(rdev);
+#endif
 }
 
 void rc_close(struct rc_dev *rdev)
@@ -769,13 +771,16 @@ static void ir_close(struct input_dev *idev)
 {
 	struct rc_dev *rdev = input_get_drvdata(idev);
 
-
+#ifdef CONFIG_MACH_XIAOMI_C6
 	 if (rdev) {
 		mutex_lock(&rdev->lock);
 		if (!--rdev->open_count)
 			rdev->close(rdev);
 		mutex_unlock(&rdev->lock);
 	}
+#else
+	rc_close(rdev);
+#endif
 }
 
 /* class for /sys/class/rc */

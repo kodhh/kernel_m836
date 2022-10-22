@@ -3242,7 +3242,7 @@ static int ep_dequeue(struct usb_ep *ep, struct usb_request *req)
 
 	dbg_event(_usb_addr(mEp), "DEQUEUE", 0);
 
-	if ((mEp->type == USB_ENDPOINT_XFER_CONTROL)) {
+	if (mEp->type == USB_ENDPOINT_XFER_CONTROL) {
 		hw_ep_flush(_udc->ep0out.num, RX);
 		hw_ep_flush(_udc->ep0in.num, TX);
 	} else {
@@ -3938,8 +3938,10 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
 	_udc = udc;
 	return retval;
 
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 del_udc:
 	usb_del_gadget_udc(&udc->gadget);
+#endif
 remove_trans:
 	if (udc->transceiver)
 		otg_set_peripheral(udc->transceiver->otg, &udc->gadget);

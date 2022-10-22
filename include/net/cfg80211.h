@@ -1599,7 +1599,7 @@ struct cfg80211_sched_scan_plan {
  * @delta: value of RSSI level adjustment.
  */
 struct cfg80211_bss_select_adjust {
-	enum nl80211_band band;
+	enum ieee80211_band band;
 	s8 delta;
 };
 

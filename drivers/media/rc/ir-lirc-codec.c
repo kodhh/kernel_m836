@@ -1,7 +1,6 @@
 /* ir-lirc-codec.c - rc-core to classic lirc interface bridge
  *
  * Copyright (C) 2010 by Jarod Wilson <jarod@redhat.com>
- * Copyright (C) 2017 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,7 +20,11 @@
 #include <media/rc-core.h>
 #include "rc-core-priv.h"
 
+#ifdef CONFIG_MACH_XIAOMI_C6
 #define LIRCBUF_SIZE 1024
+#else
+#define LIRCBUF_SIZE 256
+#endif
 
 /**
  * ir_lirc_decode() - Send raw IR data to lirc_dev to be relayed to the
@@ -298,11 +301,14 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 		if (!dev->max_timeout)
 			return -ENOSYS;
 
+		/* Check for multiply overflow */
+		if (val > U32_MAX / 1000)
+			return -EINVAL;
+
 		tmp = val * 1000;
 
-		if (tmp < dev->min_timeout ||
-		    tmp > dev->max_timeout)
-				return -EINVAL;
+		if (tmp < dev->min_timeout || tmp > dev->max_timeout)
+			return -EINVAL;
 
 		dev->timeout = tmp;
 		break;
@@ -324,6 +330,7 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 static int ir_lirc_open(void *data)
 {
 
+#ifdef CONFIG_MACH_XIAOMI_C6
 	struct lirc_codec *lirc = data;
 	struct rc_dev *dev = lirc->dev;
 	int ret = 0;
@@ -336,11 +343,15 @@ static int ir_lirc_open(void *data)
 	mutex_unlock(&dev->lock);
 
 	return ret;
+#else
+	return 0;
+#endif
 }
 
 static void ir_lirc_close(void *data)
 {
 
+#ifdef CONFIG_MACH_XIAOMI_C6
 	struct lirc_codec *lirc = data;
 	struct rc_dev *dev = lirc->dev;
 
@@ -348,6 +359,9 @@ static void ir_lirc_close(void *data)
 	if (!--dev->open_count && dev->close)
 		dev->close(dev);
 	mutex_unlock(&dev->lock);
+#else
+	return;
+#endif
 }
 
 static const struct file_operations lirc_fops = {
@@ -415,7 +429,11 @@ static int ir_lirc_register(struct rc_dev *dev)
 	drv->rbuf = rbuf;
 	drv->set_use_inc = &ir_lirc_open;
 	drv->set_use_dec = &ir_lirc_close;
+#ifdef CONFIG_MACH_XIAOMI_C6
 	drv->code_length = sizeof(int) * 8;
+#else
+	drv->code_length = sizeof(struct ir_raw_event) * 8;
+#endif
 	drv->fops = &lirc_fops;
 	drv->dev = &dev->dev;
 	drv->rdev = dev;
@@ -432,7 +450,9 @@ static int ir_lirc_register(struct rc_dev *dev)
 	return 0;
 
 lirc_register_failed:
+#ifdef CONFIG_MACH_XIAOMI_C6
 	lirc_buffer_free(rbuf);
+#endif
 rbuf_init_failed:
 	kfree(rbuf);
 rbuf_alloc_failed:
@@ -447,7 +467,9 @@ static int ir_lirc_unregister(struct rc_dev *dev)
 
 	lirc_unregister_driver(lirc->drv->minor);
 	lirc_buffer_free(lirc->drv->rbuf);
+#ifdef CONFIG_MACH_XIAOMI_C6
 	kfree(lirc->drv->rbuf);
+#endif
 	kfree(lirc->drv);
 
 	return 0;
