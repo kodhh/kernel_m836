@@ -34,10 +34,6 @@
 #include <linux/spinlock.h>
 #include <linux/zpool.h>
 
-#define ___GFP_DIRECT_RECLAIM	0x400000u
-#define ___GFP_KSWAPD_RECLAIM	0x1000000u
-#define __GFP_RECLAIM ((__force gfp_t)(___GFP_DIRECT_RECLAIM|___GFP_KSWAPD_RECLAIM))
-
 /*****************
  * Structures
 *****************/
@@ -554,7 +550,7 @@ static int z3fold_alloc(struct z3fold_pool *pool, size_t size, gfp_t gfp,
 	struct z3fold_header *zhdr = NULL;
 	struct page *page = NULL;
 	enum buddy bud;
-	bool can_sleep = (gfp & __GFP_RECLAIM) == __GFP_RECLAIM;
+	bool can_sleep = (gfp & __GFP_WAIT) == __GFP_WAIT;
 
 	if (!size || (gfp & __GFP_HIGHMEM))
 		return -EINVAL;
@@ -1117,17 +1113,6 @@ static u64 z3fold_zpool_total_size(void *pool)
 	return z3fold_get_pool_size(pool) * PAGE_SIZE;
 }
 
-static unsigned long z3fold_zpool_compact(void *pool)
-{
-	return 0;
-}
-
-static bool z3fold_zpool_compactable(void *pool, unsigned int pages)
-{
-	return false;
-}
-
-
 static struct zpool_driver z3fold_zpool_driver = {
 	.type =		"z3fold",
 	.owner =	THIS_MODULE,
@@ -1139,8 +1124,6 @@ static struct zpool_driver z3fold_zpool_driver = {
 	.map =		z3fold_zpool_map,
 	.unmap =	z3fold_zpool_unmap,
 	.total_size =	z3fold_zpool_total_size,
-	.compact =	z3fold_zpool_compact,
-	.compactable =	z3fold_zpool_compactable,
 };
 
 MODULE_ALIAS("zpool-z3fold");

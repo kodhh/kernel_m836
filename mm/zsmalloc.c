@@ -312,7 +312,7 @@ static void record_obj(unsigned long handle, unsigned long obj)
 
 #ifdef CONFIG_ZPOOL
 
-static void *zs_zpool_create(char *name, gfp_t gfp,
+static void *zs_zpool_create(const char *name, gfp_t gfp,
 			     const struct zpool_ops *zpool_ops,
 			     struct zpool *zpool)
 {
@@ -371,16 +371,6 @@ static u64 zs_zpool_total_size(void *pool)
 	return zs_get_total_pages(pool) << PAGE_SHIFT;
 }
 
-static unsigned long zs_zpool_compact(void *pool)
-{
-	return zs_compact(pool);
-}
-
-static bool zs_zpool_compactable(void *pool, unsigned int pages)
-{
-	return zs_compactable(pool, pages);
-}
-
 static struct zpool_driver zs_zpool_driver = {
 	.type =		"zsmalloc",
 	.owner =	THIS_MODULE,
@@ -392,8 +382,6 @@ static struct zpool_driver zs_zpool_driver = {
 	.map =		zs_zpool_map,
 	.unmap =	zs_zpool_unmap,
 	.total_size =	zs_zpool_total_size,
-	.compact =	zs_zpool_compact,
-	.compactable =	zs_zpool_compactable,
 };
 
 MODULE_ALIAS("zpool-zsmalloc");
@@ -561,7 +549,7 @@ static const struct file_operations zs_stat_size_ops = {
 	.release        = single_release,
 };
 
-static int zs_pool_stat_create(char *name, struct zs_pool *pool)
+static int zs_pool_stat_create(const char *name, struct zs_pool *pool)
 {
 	struct dentry *entry;
 
@@ -601,7 +589,7 @@ static void __exit zs_stat_exit(void)
 {
 }
 
-static inline int zs_pool_stat_create(char *name, struct zs_pool *pool)
+static inline int zs_pool_stat_create(const char *name, struct zs_pool *pool)
 {
 	return 0;
 }
@@ -1821,45 +1809,6 @@ unsigned long zs_compact(struct zs_pool *pool)
 }
 EXPORT_SYMBOL_GPL(zs_compact);
 
-/*
- * zs_compactable - determine whether the given number of pages can be
- * reclaimed from the pool by executing zs_compact
- * @pool: the pool to compact
- * @pages: number of pages to be reclaimed
- */
-bool zs_compactable(struct zs_pool *pool, unsigned int pages)
-{
-#ifdef CONFIG_ZSMALLOC_STAT
-	int i, objs_per_zspage;
-	struct size_class *class;
-	unsigned int nr_reclaimable_zspages, total_reclaimable_pages = 0;
-	unsigned long obj_allocated, obj_used;
-
-	for (i = 0; i < zs_size_classes; i++) {
-		class = pool->size_class[i];
-		if (class->index != i)
-			continue;
-
-		spin_lock(&class->lock);
-		obj_allocated = zs_stat_get(class, OBJ_ALLOCATED);
-		obj_used = zs_stat_get(class, OBJ_USED);
-		spin_unlock(&class->lock);
-
-		objs_per_zspage = get_maxobj_per_zspage(class->size,
-				class->pages_per_zspage);
-		nr_reclaimable_zspages = (obj_allocated - obj_used) /
-				objs_per_zspage;
-		total_reclaimable_pages += nr_reclaimable_zspages *
-				class->pages_per_zspage;
-
-		if (total_reclaimable_pages >= pages)
-			return true;
-	}
-#endif
-	return false;
-}
-EXPORT_SYMBOL_GPL(zs_compactable);
-
 void zs_pool_stats(struct zs_pool *pool, struct zs_pool_stats *stats)
 {
 	memcpy(stats, &pool->stats, sizeof(struct zs_pool_stats));
@@ -1937,7 +1886,7 @@ static int zs_register_shrinker(struct zs_pool *pool)
  * On success, a pointer to the newly created pool is returned,
  * otherwise NULL.
  */
-struct zs_pool *zs_create_pool(char *name, gfp_t flags)
+struct zs_pool *zs_create_pool(const char *name, gfp_t flags)
 {
 	int i;
 	struct zs_pool *pool;

@@ -301,7 +301,7 @@ int param_get_charp(char *buffer, const struct kernel_param *kp)
 }
 EXPORT_SYMBOL(param_get_charp);
 
-static void param_free_charp(void *arg)
+void param_free_charp(void *arg)
 {
 	maybe_kfree_parameter(*((char **)arg));
 }
