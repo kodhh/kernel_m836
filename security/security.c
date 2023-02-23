@@ -25,7 +25,6 @@
 #include <linux/mount.h>
 #include <linux/personality.h>
 #include <linux/backing-dev.h>
-#include <linux/pfk.h>
 #include <net/flow.h>
 
 #define MAX_LSM_EVM_XATTR	2
