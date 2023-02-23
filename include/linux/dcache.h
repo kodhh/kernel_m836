@@ -217,13 +217,16 @@ struct dentry_operations {
 #define DCACHE_LRU_LIST			0x00080000
 
 #define DCACHE_ENTRY_TYPE		0x00700000
-#define DCACHE_MISS_TYPE		0x00000000 /* Negative dentry */
-#define DCACHE_DIRECTORY_TYPE		0x00100000 /* Normal directory */
-#define DCACHE_AUTODIR_TYPE		0x00200000 /* Lookupless directory (presumed automount) */
-#define DCACHE_SYMLINK_TYPE		0x00300000 /* Symlink */
-#define DCACHE_FILE_TYPE		0x00400000 /* Other file type */
+#define DCACHE_MISS_TYPE		0x00000000 /* Negative dentry (maybe fallthru to nowhere) */
+#define DCACHE_WHITEOUT_TYPE		0x00100000 /* Whiteout dentry (stop pathwalk) */
+#define DCACHE_DIRECTORY_TYPE		0x00200000 /* Normal directory */
+#define DCACHE_AUTODIR_TYPE		0x00300000 /* Lookupless directory (presumed automount) */
+#define DCACHE_REGULAR_TYPE		0x00400000 /* Regular file type (or fallthru to such) */
+#define DCACHE_SPECIAL_TYPE		0x00500000 /* Other file type (or fallthru to such) */
+#define DCACHE_SYMLINK_TYPE		0x00600000 /* Symlink (or fallthru to such) */
 
 #define DCACHE_MAY_FREE			0x00800000
+#define DCACHE_FALLTHRU			0x01000000 /* Fall through to lower layer */
 #define DCACHE_OP_SELECT_INODE		0x02000000 /* Unioned entry: dcache op selects inode */
 
 #define DCACHE_ENCRYPTED_WITH_KEY	0x04000000 /* dir is encrypted with a valid key */
@@ -433,6 +436,16 @@ static inline unsigned __d_entry_type(const struct dentry *dentry)
 	return dentry->d_flags & DCACHE_ENTRY_TYPE;
 }
 
+static inline bool d_is_miss(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_MISS_TYPE;
+}
+
+static inline bool d_is_whiteout(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_WHITEOUT_TYPE;
+}
+
 static inline bool d_can_lookup(const struct dentry *dentry)
 {
 	return __d_entry_type(dentry) == DCACHE_DIRECTORY_TYPE;
@@ -453,14 +466,25 @@ static inline bool d_is_symlink(const struct dentry *dentry)
 	return __d_entry_type(dentry) == DCACHE_SYMLINK_TYPE;
 }
 
+static inline bool d_is_reg(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_REGULAR_TYPE;
+}
+
+static inline bool d_is_special(const struct dentry *dentry)
+{
+	return __d_entry_type(dentry) == DCACHE_SPECIAL_TYPE;
+}
+
 static inline bool d_is_file(const struct dentry *dentry)
 {
-	return __d_entry_type(dentry) == DCACHE_FILE_TYPE;
+	return d_is_reg(dentry) || d_is_special(dentry);
 }
 
 static inline bool d_is_negative(const struct dentry *dentry)
 {
-	return __d_entry_type(dentry) == DCACHE_MISS_TYPE;
+	// TODO: check d_is_whiteout(dentry) also.
+	return d_is_miss(dentry);
 }
 
 static inline bool d_is_positive(const struct dentry *dentry)
@@ -474,6 +498,14 @@ static inline bool d_is_su(const struct dentry *dentry)
 	       dentry->d_name.len == 2 &&
 	       !memcmp(dentry->d_name.name, "su", 2);
 }
+
+extern void d_set_fallthru(struct dentry *dentry);
+
+static inline bool d_is_fallthru(const struct dentry *dentry)
+{
+	return dentry->d_flags & DCACHE_FALLTHRU;
+}
+
 
 extern int sysctl_vfs_cache_pressure;
 
