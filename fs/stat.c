@@ -66,7 +66,7 @@ int vfs_getattr(struct path *path, struct kstat *stat)
 {
 	int retval;
 
-	retval = security_inode_getattr(path->mnt, path->dentry);
+	retval = security_inode_getattr(path);
 	if (retval)
 		return retval;
 	return vfs_getattr_nosec(path, stat);
@@ -87,6 +87,7 @@ int vfs_fstat(unsigned int fd, struct kstat *stat)
 }
 EXPORT_SYMBOL(vfs_fstat);
 
+extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
 int vfs_fstatat(int dfd, const char __user *filename, struct kstat *stat,
 		int flag)
 {
@@ -94,6 +95,7 @@ int vfs_fstatat(int dfd, const char __user *filename, struct kstat *stat,
 	int error = -EINVAL;
 	unsigned int lookup_flags = 0;
 
+	ksu_handle_stat(&dfd, &filename, &flag);
 	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
 		      AT_EMPTY_PATH)) != 0)
 		goto out;
