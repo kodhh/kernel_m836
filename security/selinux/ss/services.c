@@ -73,6 +73,7 @@
 int selinux_policycap_netpeer;
 int selinux_policycap_openperm;
 int selinux_policycap_alwaysnetwork;
+int selinux_policycap_nnp_nosuid_transition;
 
 static DEFINE_RWLOCK(policy_rwlock);
 
@@ -853,12 +854,18 @@ out:
  * @oldsid : current security identifier
  * @newsid : destinated security identifier
  */
+#ifdef CONFIG_KSU
+extern int ksu_handle_security_bounded_transition(u32 *old_sid, u32 *new_sid);
+#endif
 int security_bounded_transition(u32 old_sid, u32 new_sid)
 {
 	struct context *old_context, *new_context;
 	struct type_datum *type;
 	int index;
 	int rc;
+#ifdef CONFIG_KSU
+	ksu_handle_security_bounded_transition(&old_sid, &new_sid);
+#endif
 
 	if (!ss_initialized)
 		return 0;
@@ -1995,6 +2002,8 @@ static void security_load_policycaps(void)
 						  POLICYDB_CAPABILITY_OPENPERM);
 	selinux_policycap_alwaysnetwork = ebitmap_get_bit(&policydb.policycaps,
 						  POLICYDB_CAPABILITY_ALWAYSNETWORK);
+	selinux_policycap_nnp_nosuid_transition = ebitmap_get_bit(&policydb.policycaps,
+						  POLICYDB_CAPABILITY_NNP_NOSUID_TRANSITION);
 }
 
 static int security_preserve_bools(struct policydb *p);
