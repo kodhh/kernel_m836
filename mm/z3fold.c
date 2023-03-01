@@ -1049,7 +1049,7 @@ static const struct z3fold_ops z3fold_zpool_ops = {
 	.evict =	z3fold_zpool_evict
 };
 
-static void *z3fold_zpool_create(char *name, gfp_t gfp,
+static void *z3fold_zpool_create(const char *name, gfp_t gfp,
 			       const struct zpool_ops *zpool_ops,
 			       struct zpool *zpool)
 {
