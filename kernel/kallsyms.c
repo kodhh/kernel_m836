@@ -214,7 +214,7 @@ unsigned long kallsyms_lookup_name(const char *name)
 			return kallsyms_addresses[i];
 
 		if (cleanup_symbol_name(namebuf) && strcmp(namebuf, name) == 0)
-			return kallsyms_sym_address(i);
+			return kallsyms_addresses[i];
 	}
 	return module_kallsyms_lookup_name(name);
 }
@@ -341,7 +341,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	}
 
 	/* See if it's in a module. */
-	return module_address_lookup(addr, symbolsize, offset, modname,
+	ret = module_address_lookup(addr, symbolsize, offset, modname,
 				     namebuf);
 
 found:
