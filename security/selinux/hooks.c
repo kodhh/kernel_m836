@@ -2129,12 +2129,14 @@ static int selinux_vm_enough_memory(struct mm_struct *mm, long pages)
 	return cap_sys_admin;
 }
 
+/* binprm security operations */
+
 static int check_nnp_nosuid(const struct linux_binprm *bprm,
 			    const struct task_security_struct *old_tsec,
 			    const struct task_security_struct *new_tsec)
 {
 	int nnp = (bprm->unsafe & LSM_UNSAFE_NO_NEW_PRIVS);
-	int nosuid = !mnt_may_suid(bprm->file->f_path.mnt);
+	int nosuid = (bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID);
 	int rc;
 	u32 av;
 
@@ -2168,7 +2170,6 @@ static int check_nnp_nosuid(const struct linux_binprm *bprm,
 	 * of the permissions of the current SID.
 	 */
 	rc = security_bounded_transition(old_tsec->sid, new_tsec->sid);
-
 	if (!rc)
 		return 0;
 
