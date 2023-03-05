@@ -349,7 +349,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 	const char *name = NULL, *target = NULL, *info = NULL;
 	int error = 0;
 
-	if (bprm->cred_prepared)
+	if (bprm->called_set_creds)
 		return 0;
 
 	cxt = cred_cxt(bprm->cred);
@@ -472,7 +472,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 		;
 	}
 
-	if (bprm->unsafe & (LSM_UNSAFE_PTRACE | LSM_UNSAFE_PTRACE_CAP)) {
+	if (bprm->unsafe & LSM_UNSAFE_PTRACE) {
 		error = may_change_ptraced_domain(new_profile);
 		if (error) {
 			aa_put_profile(new_profile);

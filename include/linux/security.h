@@ -80,7 +80,6 @@ extern int cap_capset(struct cred *new, const struct cred *old,
 		      const kernel_cap_t *inheritable,
 		      const kernel_cap_t *permitted);
 extern int cap_bprm_set_creds(struct linux_binprm *bprm);
-extern int cap_bprm_secureexec(struct linux_binprm *bprm);
 extern int cap_inode_setxattr(struct dentry *dentry, const char *name,
 			      const void *value, size_t size, int flags);
 extern int cap_inode_removexattr(struct dentry *dentry, const char *name);
@@ -140,8 +139,7 @@ struct request_sock;
 /* bprm->unsafe reasons */
 #define LSM_UNSAFE_SHARE	1
 #define LSM_UNSAFE_PTRACE	2
-#define LSM_UNSAFE_PTRACE_CAP	4
-#define LSM_UNSAFE_NO_NEW_PRIVS	8
+#define LSM_UNSAFE_NO_NEW_PRIVS	4
 
 #ifdef CONFIG_MMU
 extern int mmap_min_addr_handler(struct ctl_table *table, int write,
@@ -211,7 +209,6 @@ int security_bprm_set_creds(struct linux_binprm *bprm);
 int security_bprm_check(struct linux_binprm *bprm);
 void security_bprm_committing_creds(struct linux_binprm *bprm);
 void security_bprm_committed_creds(struct linux_binprm *bprm);
-int security_bprm_secureexec(struct linux_binprm *bprm);
 int security_sb_alloc(struct super_block *sb);
 void security_sb_free(struct super_block *sb);
 int security_sb_copy_data(char *orig, char *copy);
@@ -480,11 +477,6 @@ static inline void security_bprm_committing_creds(struct linux_binprm *bprm)
 
 static inline void security_bprm_committed_creds(struct linux_binprm *bprm)
 {
-}
-
-static inline int security_bprm_secureexec(struct linux_binprm *bprm)
-{
-	return cap_bprm_secureexec(bprm);
 }
 
 static inline int security_sb_alloc(struct super_block *sb)
