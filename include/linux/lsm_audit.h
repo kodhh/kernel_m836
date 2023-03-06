@@ -59,6 +59,7 @@ struct common_audit_data {
 #define LSM_AUDIT_DATA_INODE	9
 #define LSM_AUDIT_DATA_DENTRY	10
 #define LSM_AUDIT_DATA_IOCTL_OP	11
+#define LSM_AUDIT_DATA_FILE	12
 	union 	{
 		struct path path;
 		struct dentry *dentry;
@@ -75,6 +76,7 @@ struct common_audit_data {
 #endif
 		char *kmod_name;
 		struct lsm_ioctlop_audit *op;
+		struct file *file;
 	} u;
 	/* this union contains LSM specific data */
 	union {
@@ -99,8 +101,16 @@ int ipv4_skb_to_auditdata(struct sk_buff *skb,
 int ipv6_skb_to_auditdata(struct sk_buff *skb,
 		struct common_audit_data *ad, u8 *proto);
 
+#ifdef CONFIG_AUDIT
 void common_lsm_audit(struct common_audit_data *a,
 	void (*pre_audit)(struct audit_buffer *, void *),
 	void (*post_audit)(struct audit_buffer *, void *));
+#else
+static inline void common_lsm_audit(struct common_audit_data *a,
+	void (*pre_audit)(struct audit_buffer *, void *),
+	void (*post_audit)(struct audit_buffer *, void *))
+{
+}
+#endif
 
 #endif

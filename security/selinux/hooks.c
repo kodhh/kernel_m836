@@ -1627,7 +1627,7 @@ static int current_has_perm(const struct task_struct *tsk,
 
 /* Check whether a task is allowed to use a capability. */
 static int cred_has_capability(const struct cred *cred,
-			       int cap, int audit)
+			       int cap, int audit, bool initns)
 {
 	struct common_audit_data ad;
 	struct av_decision avd;
@@ -1641,10 +1641,10 @@ static int cred_has_capability(const struct cred *cred,
 
 	switch (CAP_TO_INDEX(cap)) {
 	case 0:
-		sclass = SECCLASS_CAPABILITY;
+		sclass = initns ? SECCLASS_CAPABILITY : SECCLASS_CAP_USERNS;
 		break;
 	case 1:
-		sclass = SECCLASS_CAPABILITY2;
+		sclass = initns ? SECCLASS_CAPABILITY2 : SECCLASS_CAP2_USERNS;
 		break;
 	default:
 		printk(KERN_ERR
@@ -1731,8 +1731,8 @@ static inline int file_path_has_perm(const struct cred *cred,
 {
 	struct common_audit_data ad;
 
-	ad.type = LSM_AUDIT_DATA_PATH;
-	ad.u.path = file->f_path;
+	ad.type = LSM_AUDIT_DATA_FILE;
+	ad.u.file = file;
 	return inode_has_perm(cred, file_inode(file), av, &ad);
 }
 
@@ -1754,8 +1754,8 @@ static int file_has_perm(const struct cred *cred,
 	u32 sid = cred_sid(cred);
 	int rc;
 
-	ad.type = LSM_AUDIT_DATA_PATH;
-	ad.u.path = file->f_path;
+	ad.type = LSM_AUDIT_DATA_FILE;
+	ad.u.file = file;
 
 	if (sid != fsec->sid) {
 		rc = avc_has_perm(sid, fsec->sid,
@@ -2112,7 +2112,7 @@ static int selinux_capset(struct cred *new, const struct cred *old,
 static int selinux_capable(const struct cred *cred, struct user_namespace *ns,
 			   int cap, int audit)
 {
-	return cred_has_capability(cred, cap, audit);
+	return cred_has_capability(cred, cap, audit, ns == &init_user_ns);
 }
 
 static int selinux_quotactl(int cmds, int type, int id, struct super_block *sb)
@@ -2190,7 +2190,7 @@ static int selinux_vm_enough_memory(struct mm_struct *mm, long pages)
 	int rc, cap_sys_admin = 0;
 
 	rc = cred_has_capability(current_cred(), CAP_SYS_ADMIN,
-					SECURITY_CAP_NOAUDIT);
+				 SECURITY_CAP_NOAUDIT, true);
 	if (rc == 0)
 		cap_sys_admin = 1;
 
@@ -2304,8 +2304,8 @@ static int selinux_bprm_set_creds(struct linux_binprm *bprm)
 			new_tsec->sid = old_tsec->sid;
 	}
 
-	ad.type = LSM_AUDIT_DATA_PATH;
-	ad.u.path = bprm->file->f_path;
+	ad.type = LSM_AUDIT_DATA_FILE;
+	ad.u.file = bprm->file;
 
 	if (new_tsec->sid == old_tsec->sid) {
 		rc = avc_has_perm(old_tsec->sid, isec->sid,
@@ -3183,7 +3183,7 @@ static int selinux_inode_getsecurity(const struct inode *inode, const char *name
 			    SECURITY_CAP_NOAUDIT);
 	if (!error)
 		error = cred_has_capability(current_cred(), CAP_MAC_ADMIN,
-					    SECURITY_CAP_NOAUDIT);
+					    SECURITY_CAP_NOAUDIT, true);
 	if (!error)
 		error = security_sid_to_context_force(isec->sid, &context,
 						      &size);
@@ -3357,7 +3357,7 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 	case KDSKBENT:
 	case KDSKBSENT:
 		error = cred_has_capability(cred, CAP_SYS_TTY_CONFIG,
-					    SECURITY_CAP_AUDIT);
+					    SECURITY_CAP_AUDIT, true);
 		break;
 
 	/* default case assumes that the command will go
@@ -3422,6 +3422,18 @@ static int selinux_mmap_addr(unsigned long addr)
 static int selinux_mmap_file(struct file *file, unsigned long reqprot,
 			     unsigned long prot, unsigned long flags)
 {
+	struct common_audit_data ad;
+	int rc;
+
+	if (file) {
+		ad.type = LSM_AUDIT_DATA_FILE;
+		ad.u.file = file;
+		rc = inode_has_perm(current_cred(), file_inode(file),
+				    FILE__MAP, &ad);
+		if (rc)
+			return rc;
+	}
+
 	if (selinux_checkreqprot)
 		prot = reqprot;
 
@@ -3717,8 +3729,8 @@ static int selinux_kernel_module_from_file(struct file *file)
 					SYSTEM__MODULE_LOAD, NULL);
 
 	/* finit_module */
-	ad.type = LSM_AUDIT_DATA_PATH;
-	ad.u.path = file->f_path;
+	ad.type = LSM_AUDIT_DATA_FILE;
+	ad.u.file = file;
 
 	inode = file_inode(file);
 	isec = inode->i_security;
@@ -3767,6 +3779,19 @@ static int selinux_task_setioprio(struct task_struct *p, int ioprio)
 static int selinux_task_getioprio(struct task_struct *p)
 {
 	return current_has_perm(p, PROCESS__GETSCHED);
+}
+
+int selinux_task_prlimit(const struct cred *cred, const struct cred *tcred,
+			 unsigned int flags)
+{
+	u32 av = 0;
+
+	if (flags & LSM_PRLIMIT_WRITE)
+		av |= PROCESS__SETRLIMIT;
+	if (flags & LSM_PRLIMIT_READ)
+		av |= PROCESS__GETRLIMIT;
+	return avc_has_perm(cred_sid(cred), cred_sid(tcred),
+			    SECCLASS_PROCESS, av, NULL);
 }
 
 static int selinux_task_setrlimit(struct task_struct *p, unsigned int resource,
@@ -6047,6 +6072,7 @@ static struct security_hook_list selinux_hooks[] = {
  	LSM_HOOK_INIT(task_setnice, selinux_task_setnice),
  	LSM_HOOK_INIT(task_setioprio, selinux_task_setioprio),
  	LSM_HOOK_INIT(task_getioprio, selinux_task_getioprio),
+	LSM_HOOK_INIT(task_prlimit, selinux_task_prlimit),
  	LSM_HOOK_INIT(task_setrlimit, selinux_task_setrlimit),
  	LSM_HOOK_INIT(task_setscheduler, selinux_task_setscheduler),
  	LSM_HOOK_INIT(task_getscheduler, selinux_task_getscheduler),

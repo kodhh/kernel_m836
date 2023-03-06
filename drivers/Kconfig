@@ -196,6 +196,4 @@ source "drivers/bif/Kconfig"
 
 source "drivers/media/Kconfig"
 
-source "drivers/kernelsu/Kconfig"
-
 endmenu
