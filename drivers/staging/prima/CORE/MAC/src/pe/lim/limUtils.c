@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1140,6 +1140,9 @@ limCleanupMlm(tpAniSirGlobal pMac)
 
         tx_timer_deactivate(&pMac->lim.limTimers.g_lim_ap_ecsa_timer);
         tx_timer_delete(&pMac->lim.limTimers.g_lim_ap_ecsa_timer);
+
+        tx_timer_deactivate(&pMac->lim.limTimers.sae_auth_timer);
+        tx_timer_delete(&pMac->lim.limTimers.sae_auth_timer);
 
         pMac->lim.gLimTimersCreated = 0;
     }
@@ -4041,22 +4044,20 @@ limEnable11aProtection(tpAniSirGlobal pMac, tANI_U8 enable,
     {
         PELOG3(limLog(pMac, LOG3, FL("psessionEntry is NULL"));)
         return eSIR_FAILURE;
-    }        
-        //overlapping protection configuration check.
-        if(overlap)
+    }
+
+    //overlapping protection configuration check.
+    if(!overlap)
+    {
+        //normal protection config check
+        if ((psessionEntry->limSystemRole == eLIM_AP_ROLE) &&
+            (!psessionEntry->cfgProtection.fromlla))
         {
+            // protection disabled.
+            PELOG3(limLog(pMac, LOG3, FL("protection from 11a is disabled"));)
+            return eSIR_SUCCESS;
         }
-        else
-        {
-            //normal protection config check
-            if ((psessionEntry->limSystemRole == eLIM_AP_ROLE) &&
-                (!psessionEntry->cfgProtection.fromlla))
-            {
-                // protection disabled.
-                PELOG3(limLog(pMac, LOG3, FL("protection from 11a is disabled"));)
-                return eSIR_SUCCESS;
-            }
-        }
+    }
 
     if (enable)
     {
@@ -4200,12 +4201,8 @@ tSirRetStatus
 limEnable11gProtection(tpAniSirGlobal pMac, tANI_U8 enable,
     tANI_U8 overlap, tpUpdateBeaconParams pBeaconParams,tpPESession psessionEntry)
 {
-
     //overlapping protection configuration check.
-    if(overlap)
-    {
-    }
-    else
+    if(!overlap)
     {
         //normal protection config check
         if((psessionEntry->limSystemRole == eLIM_AP_ROLE ) &&
@@ -4215,7 +4212,7 @@ limEnable11gProtection(tpAniSirGlobal pMac, tANI_U8 enable,
             PELOG1(limLog(pMac, LOG1, FL("protection from 11b is disabled"));)
             return eSIR_SUCCESS;
         }else if(psessionEntry->limSystemRole != eLIM_AP_ROLE)
-        {   
+        {
             if(!pMac->lim.cfgProtection.fromllb)
             {
                 // protection disabled.
@@ -4757,8 +4754,6 @@ tSirRetStatus
 limEnableHtOBSSProtection(tpAniSirGlobal pMac, tANI_U8 enable,
     tANI_U8 overlap, tpUpdateBeaconParams pBeaconParams,tpPESession psessionEntry)
 {
-
-
     if(!psessionEntry->htCapability)
         return eSIR_SUCCESS; // this protection  is only for HT stations.
 
