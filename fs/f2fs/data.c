@@ -145,9 +145,10 @@ static bool f2fs_bio_post_read_required(struct bio *bio, int err)
 static void f2fs_read_end_io(struct bio *bio, int err)
 {
 	struct page *first_page = bio->bi_io_vec[0].bv_page;
+	struct f2fs_sb_info *sbi = F2FS_P_SB(bio->bi_io_vec->bv_page);
 
-	if (time_to_inject(F2FS_P_SB(bio->bi_io_vec->bv_page), FAULT_READ_IO)) {
-		f2fs_show_injection_info(FAULT_READ_IO);
+	if (time_to_inject(sbi, FAULT_READ_IO)) {
+		f2fs_show_injection_info(sbi, FAULT_READ_IO);
 		err = -EIO;
 	}
 
@@ -176,7 +177,7 @@ static void f2fs_write_end_io(struct bio *bio, int err)
 	int i;
 
 	if (time_to_inject(sbi, FAULT_WRITE_IO)) {
-		f2fs_show_injection_info(FAULT_WRITE_IO);
+		f2fs_show_injection_info(sbi, FAULT_WRITE_IO);
 		err = -EIO;
 	}
 
@@ -2265,8 +2266,11 @@ continue_unlock:
 					ret = 0;
 					if (wbc->sync_mode == WB_SYNC_ALL) {
 						cond_resched();
-						congestion_wait(BLK_RW_ASYNC,
-									HZ/50);
+#if (CONFIG_HZ > 100)
+						congestion_wait(BLK_RW_ASYNC, 2);
+#else
+						congestion_wait(BLK_RW_ASYNC, 1);
+#endif
 						goto retry_write;
 					}
 					continue;
@@ -2531,7 +2535,7 @@ static int f2fs_write_begin(struct file *file, struct address_space *mapping,
 
 	err = f2fs_is_checkpoint_ready(sbi);
 	if (err)
-		goto fail;
+ 		goto fail;
 
 	if ((f2fs_is_atomic_file(inode) &&
 			!f2fs_available_free_memory(sbi, INMEM_PAGES)) ||
