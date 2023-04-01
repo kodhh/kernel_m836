@@ -29,15 +29,11 @@
 				qcom,pull-up = <1>;
 			};
 		};
-
-		/delete-node/ qcom,pm8953_typec@bf00;
-
                 qcom,leds@a100 {
                         status = "okay";
                         compatible = "qcom,leds-qpnp";
                         reg = <0xa100 0x100>;
                         label = "mpp";
-
                         qcom,led_mpp_2 {
                                 label = "mpp";
                                 linux,name = "button-backlight";
@@ -51,6 +47,7 @@
                                 qcom,mode-ctrl = <0x61>;
                         };
                 };
+		/delete-node/ qcom,pm8953_typec@bf00;
 	};
 
 	qcom,pmi8950@2 {

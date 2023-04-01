@@ -79,7 +79,6 @@
 
             /delete-property/ qcom,resume-soc;
         };
-
         qcom,leds@a100 {
             status = "okay";
             qcom,led_mpp_2 {
@@ -475,10 +474,6 @@
 		compatible = "nxp,tfa9895";
 		reg = <0x34>;
 	};
-	tfa9895l@35 { /*tfa9895l */
-		compatible = "nxp,tfa9895l";
-		reg = <0x35>;
-	};
 };
 /*audio bring up ,zhangjianming2.wt end*/
 
@@ -540,8 +535,4 @@
         #include "battery/B5W-qrd-Coslight-4v4-4000mah.dtsi"
         #include "battery/n2-qrd-atl-4000mah.dtsi"
         /delete-node/ qcom,qrd_msm8937_sku1_2920mah;
-};
-
-&apps_iommu {
-	qcom,no-aarch64;
 };
