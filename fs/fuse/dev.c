@@ -28,13 +28,13 @@ MODULE_ALIAS("devname:fuse");
 
 static struct kmem_cache *fuse_req_cachep;
 
-static struct fuse_conn *fuse_get_conn(struct file *file)
+static struct fuse_dev *fuse_get_dev(struct file *file)
 {
 	/*
 	 * Lockless access is OK, because file->private data is set
 	 * once during mount and is valid until the file is released.
 	 */
-	return file->private_data;
+	return ACCESS_ONCE(file->private_data);
 }
 
 static void fuse_request_init(struct fuse_req *req, struct page **pages,
@@ -647,28 +647,23 @@ struct fuse_copy_state {
 	struct fuse_conn *fc;
 	int write;
 	struct fuse_req *req;
-	const struct iovec *iov;
+	struct iov_iter *iter;
 	struct pipe_buffer *pipebufs;
 	struct pipe_buffer *currbuf;
 	struct pipe_inode_info *pipe;
 	unsigned long nr_segs;
-	unsigned long seglen;
-	unsigned long addr;
 	struct page *pg;
 	unsigned len;
 	unsigned offset;
 	unsigned move_pages:1;
 };
 
-static void fuse_copy_init(struct fuse_copy_state *cs, struct fuse_conn *fc,
-			   int write,
-			   const struct iovec *iov, unsigned long nr_segs)
+static void fuse_copy_init(struct fuse_copy_state *cs, int write,
+			   struct iov_iter *iter)
 {
 	memset(cs, 0, sizeof(*cs));
-	cs->fc = fc;
 	cs->write = write;
-	cs->iov = iov;
-	cs->nr_segs = nr_segs;
+	cs->iter = iter;
 }
 
 /* Unmap and put previous page of userspace buffer */
@@ -736,22 +731,16 @@ static int fuse_copy_fill(struct fuse_copy_state *cs)
 			cs->nr_segs++;
 		}
 	} else {
-		if (!cs->seglen) {
-			BUG_ON(!cs->nr_segs);
-			cs->seglen = cs->iov[0].iov_len;
-			cs->addr = (unsigned long) cs->iov[0].iov_base;
-			cs->iov++;
-			cs->nr_segs--;
-		}
-		err = get_user_pages_fast(cs->addr, 1, cs->write, &page);
+		size_t off;
+		err = iov_iter_get_pages(cs->iter, &page, PAGE_SIZE, 1, &off);
 		if (err < 0)
 			return err;
-		BUG_ON(err != 1);
+		BUG_ON(!err);
+		cs->len = err;
+		cs->offset = off;
 		cs->pg = page;
-		cs->offset = cs->addr % PAGE_SIZE;
-		cs->len = min(PAGE_SIZE - cs->offset, cs->seglen);
-		cs->seglen -= cs->len;
-		cs->addr += cs->len;
+		cs->offset = off;
+		iov_iter_advance(cs->iter, err);
 	}
 
 	return lock_request(cs->fc, cs->req);
@@ -1288,18 +1277,21 @@ static ssize_t fuse_dev_do_read(struct fuse_conn *fc, struct file *file,
 	return err;
 }
 
-static ssize_t fuse_dev_read(struct kiocb *iocb, const struct iovec *iov,
-			      unsigned long nr_segs, loff_t pos)
+static ssize_t fuse_dev_read(struct kiocb *iocb, struct iov_iter *to)
 {
 	struct fuse_copy_state cs;
 	struct file *file = iocb->ki_filp;
-	struct fuse_conn *fc = fuse_get_conn(file);
-	if (!fc)
+	struct fuse_dev *fud = fuse_get_dev(file);
+
+	if (!fud)
 		return -EPERM;
 
-	fuse_copy_init(&cs, fc, 1, iov, nr_segs);
+	if (!iter_is_iovec(to))
+		return -EINVAL;
 
-	return fuse_dev_do_read(fc, file, &cs, iov_length(iov, nr_segs));
+	fuse_copy_init(&cs, 1, to);
+
+	return fuse_dev_do_read(fud->fc, file, &cs, iov_iter_count(to));
 }
 
 static ssize_t fuse_dev_splice_read(struct file *in, loff_t *ppos,
@@ -1311,18 +1303,19 @@ static ssize_t fuse_dev_splice_read(struct file *in, loff_t *ppos,
 	int do_wakeup = 0;
 	struct pipe_buffer *bufs;
 	struct fuse_copy_state cs;
-	struct fuse_conn *fc = fuse_get_conn(in);
-	if (!fc)
+	struct fuse_dev *fud = fuse_get_dev(in);
+
+	if (!fud)
 		return -EPERM;
 
 	bufs = kmalloc(pipe->buffers * sizeof(struct pipe_buffer), GFP_KERNEL);
 	if (!bufs)
 		return -ENOMEM;
 
-	fuse_copy_init(&cs, fc, 1, NULL, 0);
+	fuse_copy_init(&cs, 1, NULL);
 	cs.pipebufs = bufs;
 	cs.pipe = pipe;
-	ret = fuse_dev_do_read(fc, in, &cs, len);
+	ret = fuse_dev_do_read(fud->fc, in, &cs, len);
 	if (ret < 0)
 		goto out;
 
@@ -1907,17 +1900,20 @@ static ssize_t fuse_dev_do_write(struct fuse_conn *fc,
 	return err;
 }
 
-static ssize_t fuse_dev_write(struct kiocb *iocb, const struct iovec *iov,
-			      unsigned long nr_segs, loff_t pos)
+static ssize_t fuse_dev_write(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct fuse_copy_state cs;
-	struct fuse_conn *fc = fuse_get_conn(iocb->ki_filp);
-	if (!fc)
+	struct fuse_dev *fud = fuse_get_dev(iocb->ki_filp);
+
+	if (!fud)
 		return -EPERM;
 
-	fuse_copy_init(&cs, fc, 0, iov, nr_segs);
+	if (!iter_is_iovec(from))
+		return -EINVAL;
 
-	return fuse_dev_do_write(fc, &cs, iov_length(iov, nr_segs));
+	fuse_copy_init(&cs, 0, from);
+
+	return fuse_dev_do_write(fud->fc, &cs, iov_iter_count(from));
 }
 
 static ssize_t fuse_dev_splice_write(struct pipe_inode_info *pipe,
@@ -1928,12 +1924,12 @@ static ssize_t fuse_dev_splice_write(struct pipe_inode_info *pipe,
 	unsigned idx;
 	struct pipe_buffer *bufs;
 	struct fuse_copy_state cs;
-	struct fuse_conn *fc;
+	struct fuse_dev *fud;
 	size_t rem;
 	ssize_t ret;
 
-	fc = fuse_get_conn(out);
-	if (!fc)
+	fud = fuse_get_dev(out);
+	if (!fud)
 		return -EPERM;
 
 	pipe_lock(pipe);
@@ -1983,14 +1979,15 @@ static ssize_t fuse_dev_splice_write(struct pipe_inode_info *pipe,
 	}
 	pipe_unlock(pipe);
 
-	fuse_copy_init(&cs, fc, 0, NULL, nbuf);
+	fuse_copy_init(&cs, 0, NULL);
 	cs.pipebufs = bufs;
+	cs.nr_segs = nbuf;
 	cs.pipe = pipe;
 
 	if (flags & SPLICE_F_MOVE)
 		cs.move_pages = 1;
 
-	ret = fuse_dev_do_write(fc, &cs, len);
+	ret = fuse_dev_do_write(fud->fc, &cs, len);
 
 	pipe_lock(pipe);
 out_free:
@@ -2007,7 +2004,7 @@ out_free:
 static unsigned fuse_dev_poll(struct file *file, poll_table *wait)
 {
 	unsigned mask = POLLOUT | POLLWRNORM;
-	struct fuse_conn *fc = fuse_get_conn(file);
+	struct fuse_conn *fc = fuse_get_dev(file)->fc;
 	if (!fc)
 		return POLLERR;
 
@@ -2144,7 +2141,7 @@ EXPORT_SYMBOL_GPL(fuse_abort_conn);
 
 int fuse_dev_release(struct inode *inode, struct file *file)
 {
-	struct fuse_conn *fc = fuse_get_conn(file);
+	struct fuse_conn *fc = fuse_get_dev(file)->fc;
 	if (fc) {
 		spin_lock(&fc->lock);
 		fc->connected = 0;
@@ -2163,7 +2160,7 @@ EXPORT_SYMBOL_GPL(fuse_dev_release);
 
 static int fuse_dev_fasync(int fd, struct file *file, int on)
 {
-	struct fuse_conn *fc = fuse_get_conn(file);
+	struct fuse_conn *fc = fuse_get_dev(file)->fc;
 	if (!fc)
 		return -EPERM;
 
@@ -2171,18 +2168,64 @@ static int fuse_dev_fasync(int fd, struct file *file, int on)
 	return fasync_helper(fd, file, on, &fc->fasync);
 }
 
+static int fuse_device_clone(struct fuse_conn *fc, struct file *new)
+{
+	if (new->private_data)
+		return -EINVAL;
+
+	new->private_data = fuse_conn_get(fc);
+
+	return 0;
+}
+
+static long fuse_dev_ioctl(struct file *file, unsigned int cmd,
+			   unsigned long arg)
+{
+	int err = -ENOTTY;
+
+	if (cmd == FUSE_DEV_IOC_CLONE) {
+		int oldfd;
+
+		err = -EFAULT;
+		if (!get_user(oldfd, (__u32 __user *) arg)) {
+			struct file *old = fget(oldfd);
+
+			err = -EINVAL;
+			if (old) {
+				struct fuse_dev *fud = NULL;
+
+				/*
+				 * Check against file->f_op because CUSE
+				 * uses the same ioctl handler.
+				 */
+				if (old->f_op == file->f_op &&
+				    old->f_cred->user_ns == file->f_cred->user_ns)
+					fud = fuse_get_dev(old);
+
+				if (fud) {
+					mutex_lock(&fuse_mutex);
+					err = fuse_device_clone(fud->fc, file);
+					mutex_unlock(&fuse_mutex);
+				}
+				fput(old);
+			}
+		}
+	}
+	return err;
+}
+
 const struct file_operations fuse_dev_operations = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
-	.read		= do_sync_read,
-	.aio_read	= fuse_dev_read,
+	.read_iter	= fuse_dev_read,
 	.splice_read	= fuse_dev_splice_read,
-	.write		= do_sync_write,
-	.aio_write	= fuse_dev_write,
+	.write_iter	= fuse_dev_write,
 	.splice_write	= fuse_dev_splice_write,
 	.poll		= fuse_dev_poll,
 	.release	= fuse_dev_release,
 	.fasync		= fuse_dev_fasync,
+	.unlocked_ioctl = fuse_dev_ioctl,
+	.compat_ioctl   = fuse_dev_ioctl,
 };
 EXPORT_SYMBOL_GPL(fuse_dev_operations);
 
