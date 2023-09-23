@@ -67,13 +67,25 @@ static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req)
 	kfree(aio_req);
 }
 
-static void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2)
+static void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2, bool is_write)
 {
 	struct fuse_aio_req *aio_req =
 		container_of(iocb, struct fuse_aio_req, iocb);
 	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
 
 	fuse_aio_cleanup_handler(aio_req);
+
+	if (res == -EIOCBQUEUED)
+		res = 0;
+
+	if (is_write) {
+		int err;
+
+		err = generic_write_sync(iocb_fuse->ki_filp, iocb_fuse->ki_pos, 0);
+		if (err < 0 && res > 0)
+		res = err;
+	}
+
 	aio_complete(iocb_fuse, res, res2);
 }
 
@@ -85,7 +97,6 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb_fuse,
 	struct file *fuse_filp = iocb_fuse->ki_filp;
 	struct fuse_file *ff = fuse_filp->private_data;
 	struct file *passthrough_filp = ff->passthrough.filp;
-	long res;
 
 	if (!iov_iter_count(iter))
 		return 0;
@@ -104,10 +115,8 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb_fuse,
 
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
-		fuse_aio_rw_complete(&aio_req->iocb, res, 0);
 		ret = call_read_iter(passthrough_filp, &aio_req->iocb, iter);
-		if (ret != -EIOCBQUEUED)
-			fuse_aio_cleanup_handler(aio_req);
+		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, 0);
 	}
 out:
 	revert_creds(old_cred);
@@ -126,8 +135,6 @@ ssize_t fuse_passthrough_write_iter(struct kiocb *iocb_fuse,
 	struct fuse_file *ff = fuse_filp->private_data;
 	struct inode *fuse_inode = file_inode(fuse_filp);
 	struct file *passthrough_filp = ff->passthrough.filp;
-	struct inode *passthrough_inode = file_inode(passthrough_filp);
-	long res;
 
 	if (!iov_iter_count(iter))
 		return 0;
@@ -156,10 +163,8 @@ ssize_t fuse_passthrough_write_iter(struct kiocb *iocb_fuse,
 
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
-		fuse_aio_rw_complete(&aio_req->iocb, res, 0);
 		ret = call_write_iter(passthrough_filp, &aio_req->iocb, iter);
-		if (ret != -EIOCBQUEUED)
-			fuse_aio_cleanup_handler(aio_req);
+		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, 1);
 	}
 out:
 	revert_creds(old_cred);
