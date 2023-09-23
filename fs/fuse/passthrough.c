@@ -58,10 +58,15 @@ static void fuse_copyattr(struct file *dst_file, struct file *src_file)
 	i_size_write(dst, i_size_read(src));
 }
 
-static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req)
+static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req, bool is_write)
 {
 	struct kiocb *iocb = &aio_req->iocb;
 	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
+
+	if (is_write) {
+		file_end_write(iocb->ki_filp);
+		fuse_copyattr(iocb_fuse->ki_filp, iocb->ki_filp);
+	}
 
 	iocb_fuse->ki_pos = iocb->ki_pos;
 	kfree(aio_req);
@@ -73,7 +78,7 @@ static void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2, bool i
 		container_of(iocb, struct fuse_aio_req, iocb);
 	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
 
-	fuse_aio_cleanup_handler(aio_req);
+	fuse_aio_cleanup_handler(aio_req, is_write);
 
 	if (res == -EIOCBQUEUED)
 		res = 0;
