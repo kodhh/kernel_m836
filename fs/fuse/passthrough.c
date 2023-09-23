@@ -79,9 +79,9 @@ static void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2, bool i
 		res = 0;
 
 	if (is_write) {
-		int err;
+		ssize_t err;
 
-		err = generic_write_sync(iocb_fuse->ki_filp, iocb_fuse->ki_pos, 0);
+		err = generic_write_sync(iocb_fuse->ki_filp, iocb_fuse->ki_pos - res, res);
 		if (err < 0 && res > 0)
 		res = err;
 	}
@@ -116,7 +116,7 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb_fuse,
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
 		ret = call_read_iter(passthrough_filp, &aio_req->iocb, iter);
-		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, 0);
+		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, false);
 	}
 out:
 	revert_creds(old_cred);
@@ -164,7 +164,7 @@ ssize_t fuse_passthrough_write_iter(struct kiocb *iocb_fuse,
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
 		ret = call_write_iter(passthrough_filp, &aio_req->iocb, iter);
-		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, 1);
+		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, true);
 	}
 out:
 	revert_creds(old_cred);
