@@ -72,26 +72,21 @@ static void fuse_aio_cleanup_handler(struct fuse_aio_req *aio_req, bool is_write
 	kfree(aio_req);
 }
 
-static void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2, bool is_write)
+void fuse_aio_rw_complete(struct kiocb *iocb, long res, long res2, bool is_write)
 {
+	struct fuse_file *ff = iocb->ki_filp->private_data;
+
+	if (!ff->passthrough.filp)
+        aio_complete(iocb, res, res2);
+	else{
 	struct fuse_aio_req *aio_req =
 		container_of(iocb, struct fuse_aio_req, iocb);
 	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
 
 	fuse_aio_cleanup_handler(aio_req, is_write);
 
-	if (res == -EIOCBQUEUED)
-		res = 0;
-
-	if (is_write) {
-		ssize_t err;
-
-		err = generic_write_sync(iocb_fuse->ki_filp, iocb_fuse->ki_pos - res, res);
-		if (err < 0 && res > 0)
-		res = err;
-	}
-
 	aio_complete(iocb_fuse, res, res2);
+	}
 }
 
 ssize_t fuse_passthrough_read_iter(struct kiocb *iocb_fuse,
@@ -121,7 +116,8 @@ ssize_t fuse_passthrough_read_iter(struct kiocb *iocb_fuse,
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
 		ret = call_read_iter(passthrough_filp, &aio_req->iocb, iter);
-		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, false);
+		if (ret != -EIOCBQUEUED)
+			fuse_aio_cleanup_handler(aio_req, false);
 	}
 out:
 	revert_creds(old_cred);
@@ -169,7 +165,8 @@ ssize_t fuse_passthrough_write_iter(struct kiocb *iocb_fuse,
 		aio_req->iocb_fuse = iocb_fuse;
 		kiocb_clone(&aio_req->iocb, iocb_fuse, passthrough_filp);
 		ret = call_write_iter(passthrough_filp, &aio_req->iocb, iter);
-		fuse_aio_rw_complete(&aio_req->iocb, ret, 0, true);
+		if (ret != -EIOCBQUEUED)
+			fuse_aio_cleanup_handler(aio_req, true);
 	}
 out:
 	revert_creds(old_cred);

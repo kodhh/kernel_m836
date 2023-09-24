@@ -656,7 +656,7 @@ static void fuse_aio_complete(struct fuse_io_priv *io, int err, ssize_t pos)
 			}
 		}
 
-		aio_complete(io->iocb, res, 0);
+		fuse_aio_rw_complete(io->iocb, res, 0, io->write);
 		kfree(io);
 	}
 }
