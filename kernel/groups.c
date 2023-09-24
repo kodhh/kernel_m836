@@ -104,7 +104,7 @@ static int groups_from_user(struct group_info *group_info,
 }
 
 /* a simple Shell sort */
-static void groups_sort(struct group_info *group_info)
+void groups_sort(struct group_info *group_info)
 {
 	int base, max, stride;
 	int gidsetsize = group_info->ngroups;
