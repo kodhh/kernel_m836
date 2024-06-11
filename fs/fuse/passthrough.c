@@ -278,8 +278,8 @@ int fuse_passthrough_setup(struct fuse_conn *fc, struct fuse_file *ff,
 		return -EINVAL;
 
 	spin_lock(&fc->passthrough_req_lock);
-	idr_remove(&fc->passthrough_req, passthrough_fh);
 	passthrough = idr_find(&fc->passthrough_req, passthrough_fh);
+	idr_remove(&fc->passthrough_req, passthrough_fh);
 	spin_unlock(&fc->passthrough_req_lock);
 
 	if (!passthrough)
